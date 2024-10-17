@@ -109,3 +109,5 @@ venv.bak/
 *.hdf5
 *.nc
 *.tif
+**/__pycache__
+**/ecco_access

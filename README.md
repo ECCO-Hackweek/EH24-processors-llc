@@ -41,6 +41,11 @@ Presently, there are no known (to the authors) publicly available preprocessing 
   * assign_sample_interp: given gridded `point`s, assign LLC interp fields
 * Write tests, documentation, continuous integration?
 
+### Notes:
+<img src="images/bilinear_interp.png" alt="bilinear interpolation" width="200"/>
+
+- Interpolation: `profiles` by default does bilinear interpolation, computing the model equivalent to an ungridded observation as a weighted average of its four neighbors (see diagram above, from [wikipedia](https://en.wikipedia.org/wiki/Bilinear_interpolation)).
+
 ## Future additions
 - Put nearest neighbors search mapping ungridded -> gridded inside MITgcm
 - Examine treacherous interpolation at the poles

@@ -38,6 +38,7 @@ Presently, there are no known (to the authors) publicly available preprocessing 
   * Aggregate profiles from multiple tiles [see Ariane's pull request](https://github.com/MITgcm/MITgcm/pull/836)
 * Preprocessing routines shared by `obsfit` and `profiles`:
   * from _ungridded_ lat/lon, use e.g. `scipy` or `pyresample` to compute nearest _gridded_ lat/lon (careful at the poles!) 
+  <img src="images/ungrd_to_grd.png" alt="ungridded to gridded mapping" width="200"/>
   * assign_sample_interp: given gridded `point`s, assign LLC interp fields
 * Write tests, documentation, continuous integration?
 

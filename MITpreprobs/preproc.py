@@ -138,7 +138,7 @@ class UngriddedObsPreprocessor:
         self.obs_points = self.interp()
 
         # add fields to ungridded_obs_ds
-        self.obs_point_str = f'{self.pkg_str}_point'
+        self.obs_point_str = f'{self.interp_str}_point'
         self.interp_str = 'prof' if self.pkg_str == 'prof' else 'sample'
 
         if self.obs_points.ndim == 1:
@@ -257,5 +257,5 @@ class UngriddedObsPreprocessor:
         # convert from lat-lon to xyz
         # compute bilinear interp weights
         
-        self.ungridded_obs_ds[f'{self.pkg_str}_interp_weights'] = (self.dims_interp, interp_weights)
+        self.ungridded_obs_ds[f'{self.interp_str}_interp_weights'] = (self.dims_interp, interp_weights)
         

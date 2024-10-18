@@ -35,6 +35,8 @@ Presently, there are no known (to the authors) publicly available preprocessing 
 - [x] Write module `preproc` to prepare `obsfit` and `profiles` objects, assembling interp information (including `grid='llc'`)
 - [x] Investigate nearest neighbor methods -- `KDtree` is not innately aware of spherical geometry -- use `pyresample`
 - [ ] Finish documentation, tests & installation scripts
+- [ ] Set `pkg='profiles'` default `prof_interp_weights` to be given by bilinear interpolation coefficients following [Gael's routine](https://github.com/JuliaClimate/MeshArrays.jl/blob/master/src/Interpolation.jl). In summary: final nearest interp points using new sphere-aware search via `pyresample`. Map  interp points from spherical->cartesian, orthogonalize grid cells, then compute coefficients. 
+- [ ] Default for `interp_weights` for `pkg='obsfit'`  should be trilinear, following a similar routine.
 
 ### Notes:
 - Interpolation: `profiles` by default does bilinear interpolation, computing the model equivalent to an ungridded observation as a weighted average of its four neighbors, from [wikipedia](https://en.wikipedia.org/wiki/Bilinear_interpolation)).

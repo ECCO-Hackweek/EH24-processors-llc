@@ -1,3 +1,3 @@
-from utils import *
-from preproc import *
-from interp import *
+from preproc.utils import *
+from preproc.preproc import *
+from preproc.interp import *

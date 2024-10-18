@@ -2,8 +2,8 @@ import copy
 import xarray as xr
 import numpy as np
 from ecco_v4_py.llc_array_conversion import llc_tiles_to_faces, llc_tiles_to_compact
-from utils import patchface3D_5f_to_wrld, compact2worldmap
-from interp import *
+from preproc.utils import patchface3D_5f_to_wrld, compact2worldmap
+from preproc.interp import *
 
 class UngriddedObsPreprocessor:
     """
@@ -98,12 +98,12 @@ class UngriddedObsPreprocessor:
         if not ds_has_lon:
             if len(ungridded_lons) == 0:
                 ungridded_lons = [ungridded_lons]
-        self.ungridded_obs_ds[self.lon_str] = (self.dims_obs, ungridded_lons)           
+            self.ungridded_obs_ds[self.lon_str] = (self.dims_obs, ungridded_lons)           
         
         if not ds_has_lat:
             if len(ungridded_lats) == 0:
                 ungridded_lats = [ungridded_lats]
-        self.ungridded_obs_ds[self.lat_str] = (self.dims_obs, ungridded_lats)
+            self.ungridded_obs_ds[self.lat_str] = (self.dims_obs, ungridded_lats)
 
         if grid_type == 'sphericalpolar':
             return
@@ -141,9 +141,9 @@ class UngriddedObsPreprocessor:
         self.obs_point_str = f'{self.pkg_str}_point'
         self.interp_str = 'prof' if self.pkg_str == 'prof' else 'sample'
 
-        if obs_points.ndim == 1:
-            obs_points = obs_points[:, None]
-        self.ungridded_obs_ds[self.obs_point_str] = (self.dims_interp, obs_points)
+        if self.obs_points.ndim == 1:
+            self.obs_points = self.obs_points[:, None]
+        self.ungridded_obs_ds[self.obs_point_str] = (self.dims_interp, self.obs_points)
 
         # add grid interp fields
         self.get_sample_interp_info()

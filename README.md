@@ -32,24 +32,15 @@ Presently, there are no known (to the authors) publicly available preprocessing 
 * Create jupyter notebooks demonstrating different uses of the package, examining different routines within the package
 
 ### Tasks
-* Preprocessing routines specific to `obsfit`
-  * Distinction between sample and obsfit
-* Preprocessing routines specific to `profiles`
-  * Aggregate profiles from multiple tiles [see Ariane's pull request](https://github.com/MITgcm/MITgcm/pull/836)
-* Preprocessing routines shared by `obsfit` and `profiles`:
-  * from _ungridded_ lat/lon, use e.g. `scipy` or `pyresample` to compute nearest _gridded_ lat/lon (careful at the poles!) 
-  <img src="images/ungrd_to_grd.png" alt="ungridded to gridded mapping" width="200"/>
-  
-  * assign_sample_interp: given gridded `point`s, assign LLC interp fields
-* Write tests, documentation, continuous integration?
+- [x] Write module `preproc` to prepare `obsfit` and `profiles` objects, assembling interp information (including `grid='llc'`)
+- [x] Investigate nearest neighbor methods -- `KDtree` is not innately aware of spherical geometry -- use `pyresample`
+- [ ] Finish documentation, tests & installation scripts
 
 ### Notes:
-<img src="images/bilinear_interp.png" alt="bilinear interpolation" width="200"/>
-
-- Interpolation: `profiles` by default does bilinear interpolation, computing the model equivalent to an ungridded observation as a weighted average of its four neighbors (see diagram above, from [wikipedia](https://en.wikipedia.org/wiki/Bilinear_interpolation)).
+- Interpolation: `profiles` by default does bilinear interpolation, computing the model equivalent to an ungridded observation as a weighted average of its four neighbors, from [wikipedia](https://en.wikipedia.org/wiki/Bilinear_interpolation)).
 
 ## Future additions
 - Put nearest neighbors search mapping ungridded -> gridded inside MITgcm
-- Examine treacherous interpolation at the poles
+- ~~Examine treacherous interpolation at the poles~~
 
 ## Project Results

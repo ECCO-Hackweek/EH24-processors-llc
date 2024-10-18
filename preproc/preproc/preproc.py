@@ -2,8 +2,8 @@ import copy
 import xarray as xr
 import numpy as np
 from ecco_v4_py.llc_array_conversion import llc_tiles_to_faces, llc_tiles_to_compact
-from preproc.utils import patchface3D_5f_to_wrld, compact2worldmap
-from preproc.interp import *
+from utils import patchface3D_5f_to_wrld, compact2worldmap
+from interp import *
 
 class UngriddedObsPreprocessor:
     """

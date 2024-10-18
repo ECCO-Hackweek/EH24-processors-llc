@@ -1,3 +1,5 @@
-from preproc.utils import *
-from preproc.preproc import *
-from preproc.interp import *
+_all__ = [
+    "utils",
+    "preproc",
+    "interp",
+]

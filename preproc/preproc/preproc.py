@@ -1,20 +1,32 @@
+import copy
 import xarray as xr
 import numpy as np
-from scipy.spatial import KDTree
 from ecco_v4_py.llc_array_conversion import llc_tiles_to_faces, llc_tiles_to_compact
-from .utils import patchface3D_5f_to_wrld, compact2worldmap
-import copy
+from utils import patchface3D_5f_to_wrld, compact2worldmap
+from interp import *
 
 class InSituPreprocessor:
-    def __init__(self, pkg, ds=None, grid='sphericalpolar', sNx=30, sNy=30):
+    """
+    A class for preprocessing in-situ data for profiles or obsfit.
+
+    This class handles the initialization and methods required for
+    preprocessing in-situ data, including finding the nearest grid points
+    and performing interpolation.
+    """    
+    def __init__(self, pkg, insitu_ds=None, sNx=30, sNy=30):
         """
         Initialize the InSituPreprocessor class.
 
-        Parameters:
-        - pkg: The package type (either 'profiles' or 'obsfit').
-        - grid_noblank_ds: xarray dataset containing the grid information (XC, YC).
-        - grid: The type of grid being used (default 'sphericalpolar').
-        - sNx, sNy: MPI-partition tile sizes.
+        Parameters
+        ----------
+        pkg: str
+            The package type (either 'profiles' or 'obsfit').
+        insitu_ds: xarray.Dataset, optional
+            The dataset containing in-situ data. If None, an empty dataset is created.
+        sNx: int, optional
+            The size of the MPI-partition tiles in the x-direction (default is 30).
+        sNy: int, optional
+            The size of the MPI-partition tiles in the y-direction (default is 30).
         """
 
         # check inputs
@@ -22,13 +34,11 @@ class InSituPreprocessor:
             raise ValueError(f"Invalid pkg '{pkg}'. Must be either 'profiles' or 'obsfit'.")
 
         self.pkg = pkg.lower()
-        self.grid = grid
 #        self.msk = grid_noblank_ds.mskC.where(grid_noblank_ds.mskC).isel(k=0).values
         self.sNx = sNx
         self.sNy = sNy
 
-        if ds is not None:
-            self.ds = xr.Dataset()
+        self.insitu_ds = xr.Dataset() if insitu_ds is None else insitu_ds
             
         self.get_pkg_fields()
 
@@ -40,7 +50,6 @@ class InSituPreprocessor:
         self.pkg_str = 'prof' if self.pkg == 'profiles' else 'obs'
         self.iPKG = f'i{self.pkg_str.upper()}'
         self.dims_insitu = [self.iPKG]
-        self.dims_interp = self.dims_insitu + ['iINTERP'] * (self.pkg_str == 'prof')
         self.dims_depth = ['iDEPTH' if self.pkg_str == 'prof' else '']
         
         # Combine dimensions for spatial fields, including depth if applicable
@@ -48,46 +57,129 @@ class InSituPreprocessor:
         self.lon_str = 'prof_lon' if self.pkg_str == 'prof' else 'sample_lon'
         self.lat_str = 'prof_lat' if self.pkg_str == 'prof' else 'sample_lat'
    
-    def get_obs_point(self, grid_noblank_ds, ungridded_lons, ungridded_lats):
+    def get_obs_point(self, ungridded_lons=None, ungridded_lats=None, 
+                                grid_type='sphericalpolar', grid_noblank_ds=None,
+                                num_interp_points=1,
+                               ):
         """
         Find the nearest grid point for given ungridded longitude and latitude coordinates.
-        
-        Parameters:
-        - ungridded_lons: List of longitudes for observation points.
-        - ungridded_lats: List of latitudes for observation points.
-
-        TODO: Avoid land, investigate pyresample
+    
+        Parameters
+        ----------
+        ungridded_lons : list of float, optional
+            List of longitudes for observation points.
+        ungridded_lats : list of float, optional
+            List of latitudes for observation points.
+        grid_type : str, optional
+            The type of grid being used ('sphericalpolar', 'llc', or 'cubedsphere').
+        grid_noblank_ds : xarray.Dataset, optional
+            Dataset containing grid information without blanks (must have fields XC and YC).
+        num_interp_points : int, optional
+            Number of interpolation points to consider (default is 1).
+    
+        Raises
+        ------
+        ValueError
+            If the grid type is invalid or if required data is not provided.
         """
-        
-        if 'XC' not in list(grid_noblank_ds.coords) or 'YC' not in list(grid_noblank_ds.coords):
-            raise ValueError(f"grid_noblank_ds must have fields XC and YC.")
-        if len(ungridded_lons) == 0:
-            ungridded_lons = [ungridded_lons]
-        if len(ungridded_lats) == 0:
-            ungridded_lats = [ungridded_lats]
+        ds_has_lon = f'{self.lon_str}' in self.insitu_ds.keys()
+        ds_has_lat = f'{self.lat_str}' in self.insitu_ds.keys()
 
+        if (ds_has_lon) & (ds_has_lat):
+            if grid_type == 'sphericalpolar':
+                print(f'insitu dataset already has fields {self.lon_str} and {self.lat_str}. Leaving get_obs_point.')
+                return
+            
+        if (ungridded_lons is None) & (not ds_has_lon):
+            raise ValueError(f"Ungridded longitudes not provided")
+        if (ungridded_lats is None) & (not ds_has_lat):
+            raise ValueError(f"Ungridded latitudes not provided")
+            
+        if not ds_has_lon:
+            if len(ungridded_lons) == 0:
+                ungridded_lons = [ungridded_lons]
+        self.insitu_ds[self.lon_str] = (self.dims_insitu, ungridded_lons)           
         
+        if not ds_has_lat:
+            if len(ungridded_lats) == 0:
+                ungridded_lats = [ungridded_lats]
+        self.insitu_ds[self.lat_str] = (self.dims_insitu, ungridded_lats)
+
+        if grid_type == 'sphericalpolar':
+            return
+            
+        if grid_type not in {'llc', 'cubedsphere'}:
+            raise ValueError(f"Invalid grid_type: '{grid_type}'. Options supported are 'sphericalpolar', 'llc', or 'cubedsphere'.")
+
+        # grid_type is llc or curvilinear
+        if grid_noblank_ds is not None:
+            if 'XC' not in list(grid_noblank_ds.coords) or 'YC' not in list(grid_noblank_ds.coords):
+                raise ValueError(f"grid_noblank_ds must have fields XC and YC.")
+        else:
+                raise ValueError("provide grid_noblank_ds")
+            
+        # add attributes relevant to interpolation field creation
         self.xc = grid_noblank_ds.XC.values
         self.yc = grid_noblank_ds.YC.values
+        self.mask = grid_noblank_ds.hFacC.where(grid_noblank_ds.hFacC).isel(k=0).values
 
-        obs_point = _get_nearest_grid_index(self.xc, self.yc, ungridded_lons, ungridded_lats)
+        # same xc, yc in worldmap form for later        
+        nx = len(self.xc[0, 0, :]) # (last two dimensions of xc with shape (ntile, nx, nx)
+        self.xc_wm = compact2worldmap(llc_tiles_to_compact(self.xc, less_output=True), nx, 1)[0, :, :]
+        self.yc_wm = compact2worldmap(llc_tiles_to_compact(self.yc, less_output=True), nx, 1)[0, :, :]
+        self.mask_wm = compact2worldmap(llc_tiles_to_compact(self.mask, less_output=True), nx, 1)[0, :, :]
+        
+        self.max_target_grid_radius = np.max(np.abs([grid_noblank_ds.dxG.values, grid_noblank_ds.dyG.values]))
+
+        self.num_interp_points = num_interp_points        
+        self.dims_interp = self.dims_insitu + ['iINTERP']
+        # * (self.pkg_str == 'prof')
+        # if len(self.dims_interp) == 1 & num_interp_points
+
+        # run interpolation routine
+        obs_points = self.interp()
+        # add fields to insitu_ds
         self.obs_point_str = f'{self.pkg_str}_point'
         self.interp_str = 'prof' if self.pkg_str == 'prof' else 'sample'
-        setattr(self, self.obs_point_str, obs_point)
+        setattr(self, self.obs_point_str, obs_points)
+
+        if obs_points.ndim == 1:
+            obs_points = obs_points[:, None]
+        self.insitu_ds[self.obs_point_str] = (self.dims_interp, obs_points)
+
+        # add grid interp fields
+        self.get_sample_interp_info()
+
+    def interp(self):
+        """
+        Perform interpolation from observation points to grid points using pyresample.
+    
+        Returns
+        -------
+        index_array : ndarray
+            Array containing indices of the nearest grid points for the given observation points.
+        """
+        # turn from tiles to worldmap                
+        valid_input_index, valid_output_index, index_array, distance_array =\
+            get_interp_points(
+                self.insitu_ds[self.lon_str],
+                self.insitu_ds[self.lat_str],
+                self.xc_wm.ravel(),
+                self.yc_wm.ravel(),
+                nneighbours=self.num_interp_points,
+               
+ max_target_grid_radius=self.max_target_grid_radius
+            )
+        self.interp_distance = distance_array
         
-        # add fields to dataset
-        self.ds[self.obs_point_str] = (self.dims_insitu, obs_point)
-        self.ds[self.lon_str] = (self.dims_insitu, ungridded_lons)
-        self.ds[self.lat_str] = (self.dims_insitu, ungridded_lats)
-
-        if self.grid in ['llc', 'cubedsphere']:
-            self.get_sample_interp_info()
-
+        return index_array
+        
+        
     def get_sample_interp_info(self):
         """
         Interpolate sample grid information and store in the dataset.
         """
-
+        
         def empty_faces(xgrid):
             return {face: np.zeros_like(xgrid[face]) for face in range(1, 6)}
         
@@ -122,7 +214,11 @@ class InSituPreprocessor:
                     iTile[iF][tmp_i, tmp_j] = np.outer(np.ones(self.sNx), np.arange(1, self.sNy + 1))
                     jTile[iF][tmp_i, tmp_j] = np.outer(np.arange(1, self.sNx + 1), np.ones(self.sNy))
 
-        # Grab values of these fields at [prof/obs]_point    
+        # Grab values of these fields at [prof/obs]_point 
+        # save tiles in worldmap views for interp later
+        # probably a bad idea memory-wise for high res grids
+        tile_fields_wm = dict.fromkeys(tile_keys)
+
         for tile_key, tile_field in tile_fields.items():
             tile_field = {iF: tile_field[iF][None, :] for iF in tile_field}
 
@@ -132,6 +228,8 @@ class InSituPreprocessor:
             tile_field_wm = patchface3D_5f_to_wrld(tile_field)
             tile_field_at_obs_point = tile_field_wm.ravel()[getattr(self, self.obs_point_str)]
 
+            tile_fields_wm[tile_key] = tile_field_wm
+
             # profiles default: make singleton iINTERP dimension
             #                   set sample_interp_weight np.ones
             #                   this is encoded in len(self.dims_interp)
@@ -139,29 +237,27 @@ class InSituPreprocessor:
                                       (1,) * (len(self.dims_interp) - tile_field_at_obs_point.ndim))
 
             # set interp field in dataset
-            self.ds[f'{self.interp_str}_interp_{tile_key}'] = (self.dims_interp, tile_field_at_obs_point)
-            
+            self.insitu_ds[f'{self.interp_str}_interp_{tile_key}'] = (self.dims_interp, tile_field_at_obs_point)
 
-def _get_nearest_grid_index(xc, yc, ungridded_lons, ungridded_lats):
-    """
-    Find the nearest grid index for given longitude and latitude points using KDTree.
+            # save tile_fields
+            self.tile_fields_wm = tile_fields_wm
 
-    Parameters:
-    - xc, yc: Gridded longitude and latitude arrays.
-    - ungridded_lons, ungridded_lats: Ungridded longitude and latitude values for observations.
-    """
-    # turn from tiles to worldmap
-    nx = len(xc[0, 0, :]) # (last two dimensions of xc with shape (ntile, nx, nx)
-    xc_wm = compact2worldmap(llc_tiles_to_compact(xc, less_output=True), nx, 1)[0, :, :]    
-    yc_wm = compact2worldmap(llc_tiles_to_compact(yc, less_output=True), nx, 1)[0, :, :]    
-    grid_shape = xc_wm.shape
+        self.get_interp_weights()
 
-    # set up nearest neighbors KDtree
-    gridded_coords = np.c_[yc_wm.ravel(), xc_wm.ravel()]
-    ungridded_coords = np.c_[ungridded_lats, ungridded_lons]
+    def get_interp_weights(self):
+        """ 
+        Set interpolation weights
+        """
+        print('Warning: currently only supported inverse distance weighting')
+        inv_dist = 1 / self.interp_distance
 
-    kd_tree = KDTree(gridded_coords)
-    distance, nearest_grid_idx = kd_tree.query(ungridded_coords, k=1)
-    # Ensure all indices are valid (i.e. land in the worldmap-sized array)
-    assert((nearest_grid_idx>np.prod(grid_shape)).sum()==0)
-    return nearest_grid_idx
+        interp_weights = inv_dist / np.sum(inv_dist, axis=1, keepdims=True)
+        # if self.num_interp_points == 4:
+        # self.method = 'bilinear'
+        
+        # compute interp_weights from obs_points
+        # convert from lat-lon to xyz
+        # compute bilinear interp weights
+        
+        self.insitu_ds[f'{self.pkg_str}_interp_weights'] = (self.dims_interp, interp_weights)
+        

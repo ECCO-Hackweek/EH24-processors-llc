@@ -11,6 +11,7 @@ Welcome to preproc's documentation!
    
    intro
    grid
+   functions
 
 Indices and tables
 ==================

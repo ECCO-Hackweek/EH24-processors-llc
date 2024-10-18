@@ -4,32 +4,27 @@ You can also specify the grid type from the options ``sphericalpolar`` (default)
 
 .. code-block:: python
 
-    ISP = InSituPreprocessor('obsfit', grid_ds, grid='llc')
-
-    def generate_random_points(nobs, lon_range=(-180, 180), lat_range=(60, 90)):
-         lons = np.random.uniform(low=lon_range[0], high=lon_range[1], size=nobs)
-         lats = np.random.uniform(low=lat_range[0], high=lat_range[1], size=nobs)
-         return lons, lats
-
-    nobs = 10
-    ungridded_lons, ungridded_lats = generate_random_points(nobs)
-    ISP = InSituPreprocessor('obsfit', grid_ds, grid='llc')
-    ISP.get_obs_point(ungridded_lons, ungridded_lats)
-    ISP.get_sample_interp_info()
+    ISP = InSituPreprocessor('profiles')
+    ISP.get_obs_point(ungridded_lons,
+                      ungridded_lats,
+                      grid_type = 'llc',
+                      grid_noblank_ds = grid_noblank_ds,
+                      num_interp_points = 4)
 
 
 The resulting dataset ``ISP.ds`` will have the fields::
 
-    <xarray.Dataset> Size: 720B
-    Dimensions:            (iOBS: 10, iINTERP: 1)
-    Dimensions without coordinates: iOBS, iINTERP
+    <xarray.Dataset> Size: 3kB
+    Dimensions:              (iPROF: 10, iINTERP: 4)
+    Dimensions without coordinates: iPROF, iINTERP
     Data variables:
-        obs_point          (iOBS) int64 80B 88733 114170 90578 ... 124240 112345
-        obs_lon            (iOBS) float64 80B 135.2 122.5 -179.2 ... -165.4 -76.1
-        obs_lat            (iOBS) float64 80B 60.06 88.17 63.53 ... 78.58 83.08
-        obs_interp_XC11    (iOBS, iINTERP) float64 80B 112.5 52.0 ... 143.9 -39.94
-        obs_interp_YC11    (iOBS, iINTERP) float64 80B 57.28 82.38 ... 82.11 82.11
-        obs_interp_XCNINJ  (iOBS, iINTERP) float64 80B 141.8 -128.0 ... -101.1
-        obs_interp_YCNINJ  (iOBS, iINTERP) float64 80B 67.47 82.38 ... 71.6 71.6
-        obs_interp_i       (iOBS, iINTERP) float64 80B 24.0 18.0 19.0 ... 16.0 13.0
-        obs_interp_j       (iOBS, iINTERP) float64 80B 7.0 10.0 9.0 ... 20.0 5.0
+        prof_lon             (iPROF) float64 80B 87.36 56.06 97.61 ... 77.79 36.23
+        prof_lat             (iPROF) float64 80B 14.06 59.9 -42.31 ... 84.97 47.71
+        prof_point           (iPROF, iINTERP) uint32 160B 66365 66005 ... 81074
+        prof_interp_XC11     (iPROF, iINTERP) float64 320B 82.5 82.5 ... 22.5 22.5
+        prof_interp_YC11     (iPROF, iINTERP) float64 320B 10.46 10.46 ... 37.59
+        prof_interp_XCNINJ   (iPROF, iINTERP) float64 320B 111.5 111.5 ... 51.5 51.5
+        prof_interp_YCNINJ   (iPROF, iINTERP) float64 320B 36.8 36.8 ... 56.74 56.74
+        prof_interp_i        (iPROF, iINTERP) float64 320B 6.0 6.0 5.0 ... 15.0 15.0
+        prof_interp_j        (iPROF, iINTERP) float64 320B 5.0 4.0 5.0 ... 14.0 16.0
+        prof_interp_weights  (iPROF, iINTERP) float64 320B 0.5348 0.2633 ... 0.1309

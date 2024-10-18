@@ -1,5 +1,10 @@
 import numpy as np
 
+def generate_random_points(nobs, lon_range=(-180, 180), lat_range=(-90, 90)):
+    lons = np.random.uniform(low=lon_range[0], high=lon_range[1], size=nobs)
+    lats = np.random.uniform(low=lat_range[0], high=lat_range[1], size=nobs)
+    return lons, lats
+
 def patchface3D_5f_to_wrld(faces):
     # Extract dimensions from one of the faces
     nz, _, nx = faces[1].shape

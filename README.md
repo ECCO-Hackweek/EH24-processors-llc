@@ -16,7 +16,7 @@ MITgcm allows users to compare data with model equivalent information, often for
 
 | Name | Personal goals | Can help with | Role |
 | ------------- | ------------- | ------------- | ------------- |
-| Caeli G. | | | Project Lead |
+| Caeli G. | Increase Python confidence | Reading/translating MATLAB scripts | Project Lead |
 | Matthew G. | Write modular open source code | Providing template routines to build off of | Project Lead |
 | Shoshi R. | | | Project Lead |
 

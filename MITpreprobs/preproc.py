@@ -138,8 +138,8 @@ class UngriddedObsPreprocessor:
         self.obs_points = self.interp()
 
         # add fields to ungridded_obs_ds
-        self.obs_point_str = f'{self.interp_str}_point'
         self.interp_str = 'prof' if self.pkg_str == 'prof' else 'sample'
+        self.obs_point_str = f'{self.interp_str}_point'
 
         if self.obs_points.ndim == 1:
             self.obs_points = self.obs_points[:, None]

@@ -1,25 +1,25 @@
 Introduction
-=====================
-What does this look like?
+============
+This package offers routines to help MITgcm users format ungridded datasets into objects readable by ``pkg/profiles`` and ``pkg/obsfit`` using ``xarray``. In particular, ``preproc`` automates certain routines related to gridding and interpolation parameters.
 
 .. code-block:: python
 
-    from preproc.preproc import InSituPreprocessor
+    from preproc.preproc import UngriddedObsPreprocessor
 
 profiles
 ~~~~~~~~
-Here is how to use the `InSituPreprocessor` with the 'profiles' package:
+Here is how to use the `UngriddedObsPreprocessor` with the 'profiles' package:
 
 .. code-block:: python
 
-     # grid_ds has fields XC and YC
-     ISP = InSituPreprocessor('profiles', grid_ds)
+     # grid_noblank_ds has fields XC and YC and was generated without blank tiles
+     UOP = UngriddedObsPreprocessor('profiles', grid_noblank_ds)
 
 obsfit
 ~~~~~~
-Here is how to use the `InSituPreprocessor` with the 'obsfit' package:
+Here is how to use the `UngriddedObsPreprocessor` with the 'obsfit' package:
 
 .. code-block:: python
 
-    ISP = InSituPreprocessor('obsfit', grid_ds)
+    UOP = UngriddedObsPreprocessor('obsfit', grid_noblank_ds)
 

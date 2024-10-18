@@ -5,23 +5,23 @@ from ecco_v4_py.llc_array_conversion import llc_tiles_to_faces, llc_tiles_to_com
 from utils import patchface3D_5f_to_wrld, compact2worldmap
 from interp import *
 
-class InSituPreprocessor:
+class UngriddedObsPreprocessor:
     """
-    A class for preprocessing in-situ data for profiles or obsfit.
+    A class for preprocessing ungridded observational data for profiles or obsfit.
 
     This class handles the initialization and methods required for
-    preprocessing in-situ data, including finding the nearest grid points
+    preprocessing ungridded data, including finding the nearest grid points
     and performing interpolation.
     """    
-    def __init__(self, pkg, insitu_ds=None, sNx=30, sNy=30):
+    def __init__(self, pkg, ungridded_obs_ds=None, sNx=30, sNy=30):
         """
-        Initialize the InSituPreprocessor class.
+        Initialize the UngriddedObsPreprocessor class.
 
         Parameters
         ----------
         pkg: str
             The package type (either 'profiles' or 'obsfit').
-        insitu_ds: xarray.Dataset, optional
+        ungridded_obs_ds: xarray.Dataset, optional
             The dataset containing in-situ data. If None, an empty dataset is created.
         sNx: int, optional
             The size of the MPI-partition tiles in the x-direction (default is 30).
@@ -38,7 +38,7 @@ class InSituPreprocessor:
         self.sNx = sNx
         self.sNy = sNy
 
-        self.insitu_ds = xr.Dataset() if insitu_ds is None else insitu_ds
+        self.ungridded_obs_ds = xr.Dataset() if ungridded_obs_ds is None else ungridded_obs_ds
             
         self.get_pkg_fields()
 
@@ -49,11 +49,11 @@ class InSituPreprocessor:
         # Define dimensions for in-situ, interpolation, and depth based on the package 
         self.pkg_str = 'prof' if self.pkg == 'profiles' else 'obs'
         self.iPKG = f'i{self.pkg_str.upper()}'
-        self.dims_insitu = [self.iPKG]
+        self.dims_obs = [self.iPKG]
         self.dims_depth = ['iDEPTH' if self.pkg_str == 'prof' else '']
         
         # Combine dimensions for spatial fields, including depth if applicable
-        self.dims_spatial = self.dims_insitu + self.dims_depth * (len(self.dims_depth[0]) > 0)
+        self.dims_spatial = self.dims_obs + self.dims_depth * (len(self.dims_depth[0]) > 0)
         self.lon_str = 'prof_lon' if self.pkg_str == 'prof' else 'sample_lon'
         self.lat_str = 'prof_lat' if self.pkg_str == 'prof' else 'sample_lat'
    
@@ -82,12 +82,12 @@ class InSituPreprocessor:
         ValueError
             If the grid type is invalid or if required data is not provided.
         """
-        ds_has_lon = f'{self.lon_str}' in self.insitu_ds.keys()
-        ds_has_lat = f'{self.lat_str}' in self.insitu_ds.keys()
+        ds_has_lon = f'{self.lon_str}' in self.ungridded_obs_ds.keys()
+        ds_has_lat = f'{self.lat_str}' in self.ungridded_obs_ds.keys()
 
         if (ds_has_lon) & (ds_has_lat):
             if grid_type == 'sphericalpolar':
-                print(f'insitu dataset already has fields {self.lon_str} and {self.lat_str}. Leaving get_obs_point.')
+                print(f'Ungridded dataset already has fields {self.lon_str} and {self.lat_str}. Leaving get_obs_point.')
                 return
             
         if (ungridded_lons is None) & (not ds_has_lon):
@@ -98,12 +98,12 @@ class InSituPreprocessor:
         if not ds_has_lon:
             if len(ungridded_lons) == 0:
                 ungridded_lons = [ungridded_lons]
-        self.insitu_ds[self.lon_str] = (self.dims_insitu, ungridded_lons)           
+        self.ungridded_obs_ds[self.lon_str] = (self.dims_obs, ungridded_lons)           
         
         if not ds_has_lat:
             if len(ungridded_lats) == 0:
                 ungridded_lats = [ungridded_lats]
-        self.insitu_ds[self.lat_str] = (self.dims_insitu, ungridded_lats)
+        self.ungridded_obs_ds[self.lat_str] = (self.dims_obs, ungridded_lats)
 
         if grid_type == 'sphericalpolar':
             return
@@ -132,20 +132,18 @@ class InSituPreprocessor:
         self.max_target_grid_radius = np.max(np.abs([grid_noblank_ds.dxG.values, grid_noblank_ds.dyG.values]))
 
         self.num_interp_points = num_interp_points        
-        self.dims_interp = self.dims_insitu + ['iINTERP']
-        # * (self.pkg_str == 'prof')
-        # if len(self.dims_interp) == 1 & num_interp_points
+        self.dims_interp = self.dims_obs + ['iINTERP']
 
         # run interpolation routine
-        obs_points = self.interp()
-        # add fields to insitu_ds
+        self.obs_points = self.interp()
+
+        # add fields to ungridded_obs_ds
         self.obs_point_str = f'{self.pkg_str}_point'
         self.interp_str = 'prof' if self.pkg_str == 'prof' else 'sample'
-        setattr(self, self.obs_point_str, obs_points)
 
         if obs_points.ndim == 1:
             obs_points = obs_points[:, None]
-        self.insitu_ds[self.obs_point_str] = (self.dims_interp, obs_points)
+        self.ungridded_obs_ds[self.obs_point_str] = (self.dims_interp, obs_points)
 
         # add grid interp fields
         self.get_sample_interp_info()
@@ -162,8 +160,8 @@ class InSituPreprocessor:
         # turn from tiles to worldmap                
         valid_input_index, valid_output_index, index_array, distance_array =\
             get_interp_points(
-                self.insitu_ds[self.lon_str],
-                self.insitu_ds[self.lat_str],
+                self.ungridded_obs_ds[self.lon_str],
+                self.ungridded_obs_ds[self.lat_str],
                 self.xc_wm.ravel(),
                 self.yc_wm.ravel(),
                 nneighbours=self.num_interp_points,
@@ -226,7 +224,7 @@ class InSituPreprocessor:
             #     Replace with ecco.faces_to_tiles
             #     then tiles_to_world
             tile_field_wm = patchface3D_5f_to_wrld(tile_field)
-            tile_field_at_obs_point = tile_field_wm.ravel()[getattr(self, self.obs_point_str)]
+            tile_field_at_obs_point = tile_field_wm.ravel()[self.obs_points]
 
             tile_fields_wm[tile_key] = tile_field_wm
 
@@ -237,7 +235,7 @@ class InSituPreprocessor:
                                       (1,) * (len(self.dims_interp) - tile_field_at_obs_point.ndim))
 
             # set interp field in dataset
-            self.insitu_ds[f'{self.interp_str}_interp_{tile_key}'] = (self.dims_interp, tile_field_at_obs_point)
+            self.ungridded_obs_ds[f'{self.interp_str}_interp_{tile_key}'] = (self.dims_interp, tile_field_at_obs_point)
 
             # save tile_fields
             self.tile_fields_wm = tile_fields_wm
@@ -259,5 +257,5 @@ class InSituPreprocessor:
         # convert from lat-lon to xyz
         # compute bilinear interp weights
         
-        self.insitu_ds[f'{self.pkg_str}_interp_weights'] = (self.dims_interp, interp_weights)
+        self.ungridded_obs_ds[f'{self.pkg_str}_interp_weights'] = (self.dims_interp, interp_weights)
         

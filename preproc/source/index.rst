@@ -8,7 +8,7 @@ Welcome to preproc's documentation!
 
 .. toctree::
    :maxdepth: 2
-   
+
    intro
    grid
    functions

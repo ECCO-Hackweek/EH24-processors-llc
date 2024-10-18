@@ -47,4 +47,3 @@ Presently, there are no known (to the authors) publicly available preprocessing 
 
 ## Project Results
 ![Pre-processing for pkg_profiles and pkg_obsfit](https://github.com/user-attachments/assets/46ba0194-958f-4189-979a-5f75a54d99dd)
-)

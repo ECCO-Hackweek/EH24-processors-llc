@@ -4,7 +4,7 @@ You can also specify the grid type from the options ``sphericalpolar`` (default)
 
 .. code-block:: python
 
-    >>> from preproc.utils import generate_random_points
+    >>> from MITpreprobs.utils import generate_random_points
     >>> num_obs = 10
     >>> ungridded_lons, ungridded_lats = generate_random_points(num_obs)
     >>> UOP = UngriddedObsPreprocessor('profiles')

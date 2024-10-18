@@ -1,10 +1,10 @@
 Introduction
 ============
-This package offers routines to help MITgcm users format ungridded datasets into objects readable by ``pkg/profiles`` and ``pkg/obsfit`` using ``xarray``. In particular, ``preproc`` automates certain routines related to gridding and interpolation parameters.
+This package offers routines to help MITgcm users format ungridded datasets into objects readable by ``pkg/profiles`` and ``pkg/obsfit`` using ``xarray``. In particular, ``MITpreprobs`` automates certain routines related to gridding and interpolation parameters.
 
 .. code-block:: python
 
-    from preproc.preproc import UngriddedObsPreprocessor
+    from MITpreprobs.preproc import UngriddedObsPreprocessor
 
 profiles
 ~~~~~~~~

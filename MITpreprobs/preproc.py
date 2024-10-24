@@ -13,7 +13,7 @@ class UngriddedObsPreprocessor:
     preprocessing ungridded data, including finding the nearest grid points
     and performing interpolation.
     """    
-    def __init__(self, pkg, ungridded_obs_ds=None, sNx=30, sNy=30):
+    def __init__(self, pkg, ungridded_obs_ds=None):
         """
         Initialize the UngriddedObsPreprocessor class.
 
@@ -23,10 +23,6 @@ class UngriddedObsPreprocessor:
             The package type (either 'profiles' or 'obsfit').
         ungridded_obs_ds: xarray.Dataset, optional
             The dataset containing in-situ data. If None, an empty dataset is created.
-        sNx: int, optional
-            The size of the MPI-partition tiles in the x-direction (default is 30).
-        sNy: int, optional
-            The size of the MPI-partition tiles in the y-direction (default is 30).
         """
 
         # check inputs
@@ -35,8 +31,6 @@ class UngriddedObsPreprocessor:
 
         self.pkg = pkg.lower()
 #        self.msk = grid_noblank_ds.mskC.where(grid_noblank_ds.mskC).isel(k=0).values
-        self.sNx = sNx
-        self.sNy = sNy
 
         self.ungridded_obs_ds = xr.Dataset() if ungridded_obs_ds is None else ungridded_obs_ds
             
@@ -47,19 +41,16 @@ class UngriddedObsPreprocessor:
         Set package-specific attributes based on the 'pkg' input.
         """
         # Define dimensions for in-situ, interpolation, and depth based on the package 
-        self.pkg_str = 'prof' if self.pkg == 'profiles' else 'obs'
-        self.iPKG = f'i{self.pkg_str.upper()}'
-        self.dims_obs = [self.iPKG]
-        self.dims_depth = ['iDEPTH' if self.pkg_str == 'prof' else '']
+        self.pkg_str, self.dims_obs, self.dims_depth = ('prof', ['iPROF'], ['iDEPTH']) if self.pkg == 'profiles' else ('obs', ['iSAMPLE'], [''])
         
         # Combine dimensions for spatial fields, including depth if applicable
         self.dims_spatial = self.dims_obs + self.dims_depth * (len(self.dims_depth[0]) > 0)
-        self.lon_str = 'prof_lon' if self.pkg_str == 'prof' else 'sample_lon'
-        self.lat_str = 'prof_lat' if self.pkg_str == 'prof' else 'sample_lat'
-   
+        self.lon_str, self.lat_str = tuple([f'{self.dims_obs[0][1:].lower()}_{x}' for x in ['lon', 'lat']])
+
+
     def get_obs_point(self, ungridded_lons=None, ungridded_lats=None, 
                                 grid_type='sphericalpolar', grid_noblank_ds=None,
-                                num_interp_points=1,
+                                num_interp_points=1, sNx=30, sNy=30
                                ):
         """
         Find the nearest grid point for given ungridded longitude and latitude coordinates.
@@ -76,12 +67,18 @@ class UngriddedObsPreprocessor:
             Dataset containing grid information without blanks (must have fields XC and YC).
         num_interp_points : int, optional
             Number of interpolation points to consider (default is 1).
+        sNx: int, optional
+            The size of the MPI-partition tiles in the x-direction (default is 30).
+        sNy: int, optional
+            The size of the MPI-partition tiles in the y-direction (default is 30).
     
         Raises
         ------
         ValueError
             If the grid type is invalid or if required data is not provided.
         """
+        self.sNx = sNx
+        self.sNy = sNy
         ds_has_lon = f'{self.lon_str}' in self.ungridded_obs_ds.keys()
         ds_has_lat = f'{self.lat_str}' in self.ungridded_obs_ds.keys()
 
@@ -248,6 +245,8 @@ class UngriddedObsPreprocessor:
         """
         print('Warning: currently only supported inverse distance weighting')
         inv_dist = 1 / self.interp_distance
+        if inv_dist.ndim == 1:
+            inv_dist = np.expand_dims(inv_dist, axis=1)
 
         interp_weights = inv_dist / np.sum(inv_dist, axis=1, keepdims=True)
         # if self.num_interp_points == 4:

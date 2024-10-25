@@ -50,7 +50,7 @@ class UngriddedObsPreprocessor:
 
     def get_obs_point(self, ungridded_lons=None, ungridded_lats=None, 
                                 grid_type='sphericalpolar', grid_noblank_ds=None,
-                                num_interp_points=1, sNx=30, sNy=30
+                                num_interp_points=1, sNx=30, sNy=30, max_target_grid_radius=None,
                                ):
         """
         Find the nearest grid point for given ungridded longitude and latitude coordinates.
@@ -71,7 +71,8 @@ class UngriddedObsPreprocessor:
             The size of the MPI-partition tiles in the x-direction (default is 30).
         sNy: int, optional
             The size of the MPI-partition tiles in the y-direction (default is 30).
-    
+        max_target_grid_radius: float, optional
+            The nearest neighbours search radius (default None)
         Raises
         ------
         ValueError
@@ -126,7 +127,10 @@ class UngriddedObsPreprocessor:
         self.yc_wm = compact2worldmap(llc_tiles_to_compact(self.yc, less_output=True), nx, 1)[0, :, :]
         self.mask_wm = compact2worldmap(llc_tiles_to_compact(self.mask, less_output=True), nx, 1)[0, :, :]
         
-        self.max_target_grid_radius = np.max(np.abs([grid_noblank_ds.dxG.values, grid_noblank_ds.dyG.values]))
+        # set nearest neighbours search radius
+        if max_target_grid_radius == None:
+            max_target_grid_radius = np.max(np.abs([grid_noblank_ds.dxG.values, grid_noblank_ds.dyG.values]))
+        self.max_target_grid_radius = max_target_grid_radius
 
         self.num_interp_points = num_interp_points        
         self.dims_interp = self.dims_obs + ['iINTERP']
@@ -155,7 +159,7 @@ class UngriddedObsPreprocessor:
             Array containing indices of the nearest grid points for the given observation points.
         """
         # turn from tiles to worldmap                
-        valid_input_index, valid_output_index, index_array, distance_array =\
+        valid_input_index, valid_output_index, index_array, distance_array, max_target_grid_radius =\
             get_interp_points(
                 self.ungridded_obs_ds[self.lon_str],
                 self.ungridded_obs_ds[self.lat_str],
@@ -165,6 +169,7 @@ class UngriddedObsPreprocessor:
                 max_target_grid_radius=self.max_target_grid_radius
             )
         self.interp_distance = distance_array
+        self.max_target_grid_radius = max_target_grid_radius
         
         return index_array
         

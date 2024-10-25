@@ -60,3 +60,51 @@ def get_interp_points(ungridded_lons, ungridded_lats,
 
     return (valid_input_index, valid_output_index, index_array, distance_array, max_target_grid_radius)
     
+
+
+def get_depth_indices(rC, depth_cur):
+
+    """
+    Get vertical interpolation levels for ungridded depths based on a source grid.
+
+    Parameters
+    ----------
+    rC : array-like
+        depths of vertical layers in model (negative values)
+    depth_cur : array-like
+        depths of ungridded points (positive values)
+  
+    Returns
+    -------
+    tuple
+        A tuple of (sample_k1, sample_k2, depth_fac)
+    """
+
+    sample_k1 = np.zeros_like(depth_cur)#, dtype=int)
+    sample_k2 = np.zeros_like(depth_cur)#, dtype=int)
+    depth_fac = np.zeros_like(depth_cur)#, dtype=float)
+    
+    # Case 1: above first depth level
+    mask_above_first = -rC[0] > depth_cur
+    sample_k1[mask_above_first] = 1
+    sample_k2[mask_above_first] = 1
+    depth_fac[mask_above_first] = 1.0
+    
+    # Case 2: below last depth level
+    mask_below_last = -rC[Nr-1] <= depth_cur
+    sample_k1[mask_below_last] = Nr
+    sample_k2[mask_below_last] = Nr
+    depth_fac[mask_below_last] = 1.0
+    
+    # Case 3: between two depth levels
+    mask_between = ~mask_above_first & ~mask_below_last
+    
+    for k in range(Nr-1):
+        mask_between_k = (-rC[k] <= depth_cur) & (-rC[k+1] > depth_cur) & mask_between
+        sample_k1[mask_between_k] = k+1
+        sample_k2[mask_between_k] = k+2
+        depth_1 = -rC[k]
+        depth_2 = -rC[k+1]
+        depth_fac[mask_between_k] = (depth_cur[mask_between_k] - depth_1) / (depth_2 - depth_1)
+
+    return (sample_k1, sample_k2, depth_fac)

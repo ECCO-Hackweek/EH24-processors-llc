@@ -2,8 +2,8 @@ import copy
 import xarray as xr
 import numpy as np
 from ecco_v4_py.llc_array_conversion import llc_tiles_to_faces, llc_tiles_to_compact
-from MITpreprobs.utils import patchface3D_5f_to_wrld, compact2worldmap
-from MITpreprobs.interp import *
+from obsprep.utils import patchface3D_5f_to_wrld, compact2worldmap
+from obsprep.interp import *
 
 class UngriddedObsPreprocessor:
     """
@@ -162,8 +162,7 @@ class UngriddedObsPreprocessor:
                 self.xc_wm.ravel(),
                 self.yc_wm.ravel(),
                 nneighbours=self.num_interp_points,
-               
- max_target_grid_radius=self.max_target_grid_radius
+                max_target_grid_radius=self.max_target_grid_radius
             )
         self.interp_distance = distance_array
         

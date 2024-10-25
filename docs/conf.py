@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'MITpreprobs'
+project = 'obsprep'
 copyright = '2024, Goldberg, M., Griffin, C., Reich, S.'
 author = 'Goldberg, M., Griffin, C., Reich, S.'
 release = '0.1'
@@ -35,5 +35,5 @@ html_theme = 'sphinx_rtd_theme'
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../MITpreprobs/preproc'))
-sys.path.insert(0, os.path.abspath('../MITpreprobs/'))
+sys.path.insert(0, os.path.abspath('../obsprep/preproc'))
+sys.path.insert(0, os.path.abspath('../obsprep/'))

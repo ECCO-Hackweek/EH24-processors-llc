@@ -146,3 +146,22 @@ def patchface3D(fldin,nx,nz):
     a[:,0:3*nx,3*nx:4*nx]=tmp1
 
     return a
+
+
+def get_sample_type(ds, fld):
+
+    if fld == 'T':
+        fac = 1
+    elif fld == 'S':
+        fac = 2
+    elif fld == 'U':
+        fac = 3
+    elif fld == 'V':
+        fac = 4
+    elif fld == 'SSH':
+        fac = 5
+
+    ds['sample_type'] = ("iSAMPLE", fac * np.ones_like(ds.sample_lat.values) )
+
+    return ds
+

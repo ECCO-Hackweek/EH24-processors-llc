@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import xarray as xr
-from MITpreprobs.preproc import UngriddedObsPreprocessor
+from obsprep.preproc import UngriddedObsPreprocessor
 
 @pytest.fixture
 def mock_dataset():

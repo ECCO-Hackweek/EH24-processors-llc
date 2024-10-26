@@ -11,6 +11,7 @@ Welcome to obsprep' documentation!
 
    intro
    grid
+   time
    functions
 
 Indices and tables

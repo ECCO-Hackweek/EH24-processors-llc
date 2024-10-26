@@ -14,6 +14,8 @@ setup(
         'xarray',
         'scipy',
         'numpy',
+        'pandas',
+        'datetime',
     ],
     tests_require=[
         'pytest',

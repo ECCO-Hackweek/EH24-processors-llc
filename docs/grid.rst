@@ -4,17 +4,16 @@ You can also specify the grid type from the options ``sphericalpolar`` (default)
 
 .. code-block:: python
 
-    >>> from obsprep.utils import generate_random_points
-    >>> from obsprep.preproc import UngriddedObsPreprocessor
+    >>> import obsprep as op
     >>> num_obs = 10
-    >>> ungridded_lons, ungridded_lats = generate_random_points(num_obs)
-    >>> UOP = UngriddedObsPreprocessor('profiles')
-    >>> UOP.get_obs_point(ungridded_lons,
-    >>>                   ungridded_lats,
-    >>>                   grid_type = 'llc',
-    >>>                   grid_noblank_ds = grid_noblank_ds,
-    >>>                   num_interp_points = 4)
-    >>> print(UOP.ungridded_obs_ds)
+    >>> lons, lats = op.utils.generate_random_points(num_obs)
+    >>> OP = op.Prep('profiles')
+    >>> OP.get_obs_point(lons,
+    >>>                  lats,
+    >>>                  grid_type = 'llc',
+    >>>                  grid_ds = grid_ds,
+    >>>                  num_interp_points = 4)
+    >>> print(OP.ds)
 
     <xarray.Dataset> Size: 3kB
     Dimensions:              (iPROF: 10, iINTERP: 4)
@@ -35,7 +34,7 @@ Alternatively, the user can provide an incomplete ungridded observation dataset 
 
 .. code-block:: python
 
-    >>> print(ungridded_obs_ds_in)
+    >>> print(ds_in)
 
     <xarray.Dataset> Size: 8kB
     Dimensions:       (iPROF: 10, iDEPTH: 50)
@@ -46,12 +45,12 @@ Alternatively, the user can provide an incomplete ungridded observation dataset 
         prof_T        (iPROF, iDEPTH) float64 4kB 28.72 28.61 27.95 ... 4.05 3.513
         prof_Tweight  (iPROF, iDEPTH) float64 4kB 0.5819 0.6558 ... 2.741 2.835
 
-    >>> UOP = UngriddedObsPreprocessor('profiles', ungridded_obs_ds = ungridded_obs_ds_in)
-    >>> UOP.get_obs_point(grid_type = 'llc',
-    >>>                   grid_noblank_ds = grid_noblank_ds,
-    >>>                   num_interp_points = 4)
-    >>> ungridded_obs_ds_out = UOP.ungridded_obs_ds
-    >>> print(ungridded_obs_ds_out)
+    >>> OP = op.Prep('profiles', ds = ds_in)
+    >>> OP.get_obs_point(grid_type = 'llc',
+    >>>                  grid_ds = grid_ds,
+    >>>                  num_interp_points = 4)
+    >>> ds_out = OP.ds
+    >>> print(ds_out)
 
     <xarray.Dataset> Size: 11kB
     Dimensions:              (iPROF: 10, iDEPTH: 50, iINTERP: 4)

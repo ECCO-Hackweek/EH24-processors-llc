@@ -4,25 +4,26 @@ import numpy as np
 from ecco_v4_py.llc_array_conversion import llc_tiles_to_faces, llc_tiles_to_compact
 from obsprep.utils import patchface3D_5f_to_wrld, compact2worldmap
 from obsprep.interp import *
+from obsprep.time_utils import get_obs_datetime
 
-class UngriddedObsPreprocessor:
+class Prep:
     """
     A class for preprocessing ungridded observational data for profiles or obsfit.
 
     This class handles the initialization and methods required for
-    preprocessing ungridded data, including finding the nearest grid points
-    and performing interpolation.
+    preprocessing observational data, including generating interpolation and 
+    temporal metadata.
     """    
-    def __init__(self, pkg, ungridded_obs_ds=None):
+    def __init__(self, pkg, ds=None):
         """
-        Initialize the UngriddedObsPreprocessor class.
+        Initialize the Prep class.
 
         Parameters
         ----------
         pkg: str
             The package type (either 'profiles' or 'obsfit').
-        ungridded_obs_ds: xarray.Dataset, optional
-            The dataset containing in-situ data. If None, an empty dataset is created.
+        ds: xarray.Dataset, optional
+            The dataset containing observational data. If None, an empty dataset is created.
         """
 
         # check inputs
@@ -32,7 +33,7 @@ class UngriddedObsPreprocessor:
         self.pkg = pkg.lower()
 #        self.msk = grid_noblank_ds.mskC.where(grid_noblank_ds.mskC).isel(k=0).values
 
-        self.ungridded_obs_ds = xr.Dataset() if ungridded_obs_ds is None else ungridded_obs_ds
+        self.ds = xr.Dataset() if ds is None else ds
             
         self.get_pkg_fields()
 
@@ -48,7 +49,7 @@ class UngriddedObsPreprocessor:
         self.lon_str, self.lat_str = tuple([f'{self.dims_obs[0][1:].lower()}_{x}' for x in ['lon', 'lat']])
 
 
-    def get_obs_point(self, ungridded_lons=None, ungridded_lats=None, 
+    def get_obs_point(self, lons=None, lats=None, 
                                 grid_type='sphericalpolar', grid_noblank_ds=None,
                                 num_interp_points=1, sNx=30, sNy=30, max_target_grid_radius=None,
                                ):
@@ -57,9 +58,9 @@ class UngriddedObsPreprocessor:
     
         Parameters
         ----------
-        ungridded_lons : list of float, optional
+        lons : list of float, optional
             List of longitudes for observation points.
-        ungridded_lats : list of float, optional
+        lats : list of float, optional
             List of latitudes for observation points.
         grid_type : str, optional
             The type of grid being used ('sphericalpolar', 'llc', or 'cubedsphere').
@@ -80,28 +81,28 @@ class UngriddedObsPreprocessor:
         """
         self.sNx = sNx
         self.sNy = sNy
-        ds_has_lon = f'{self.lon_str}' in self.ungridded_obs_ds.keys()
-        ds_has_lat = f'{self.lat_str}' in self.ungridded_obs_ds.keys()
+        ds_has_lon = f'{self.lon_str}' in self.ds.keys()
+        ds_has_lat = f'{self.lat_str}' in self.ds.keys()
 
         if (ds_has_lon) & (ds_has_lat):
             if grid_type == 'sphericalpolar':
-                print(f'Ungridded dataset already has fields {self.lon_str} and {self.lat_str}. Leaving get_obs_point.')
+                print(f'Dataset already has fields {self.lon_str} and {self.lat_str}. Leaving get_obs_point.')
                 return
             
-        if (ungridded_lons is None) & (not ds_has_lon):
-            raise ValueError(f"Ungridded longitudes not provided")
-        if (ungridded_lats is None) & (not ds_has_lat):
-            raise ValueError(f"Ungridded latitudes not provided")
+        if (lons is None) & (not ds_has_lon):
+            raise ValueError(f"longitudes not provided")
+        if (lats is None) & (not ds_has_lat):
+            raise ValueError(f"latitudes not provided")
             
         if not ds_has_lon:
-            if len(ungridded_lons) == 0:
-                ungridded_lons = [ungridded_lons]
-            self.ungridded_obs_ds[self.lon_str] = (self.dims_obs, ungridded_lons)           
+            if len(lons) == 0:
+                lons = [lons]
+            self.ds[self.lon_str] = (self.dims_obs, lons)           
         
         if not ds_has_lat:
-            if len(ungridded_lats) == 0:
-                ungridded_lats = [ungridded_lats]
-            self.ungridded_obs_ds[self.lat_str] = (self.dims_obs, ungridded_lats)
+            if len(lats) == 0:
+                lats = [lats]
+            self.ds[self.lat_str] = (self.dims_obs, lats)
 
         if grid_type == 'sphericalpolar':
             return
@@ -138,13 +139,13 @@ class UngriddedObsPreprocessor:
         # run interpolation routine
         self.obs_points = self.interp()
 
-        # add fields to ungridded_obs_ds
+        # add fields to ds
         self.interp_str = 'prof' if self.pkg_str == 'prof' else 'sample'
         self.obs_point_str = f'{self.interp_str}_point'
 
         if self.obs_points.ndim == 1:
             self.obs_points = self.obs_points[:, None]
-        self.ungridded_obs_ds[self.obs_point_str] = (self.dims_interp, self.obs_points)
+        self.ds[self.obs_point_str] = (self.dims_interp, self.obs_points)
 
         # add grid interp fields
         self.get_sample_interp_info()
@@ -161,8 +162,8 @@ class UngriddedObsPreprocessor:
         # turn from tiles to worldmap                
         valid_input_index, valid_output_index, index_array, distance_array, max_target_grid_radius =\
             get_interp_points(
-                self.ungridded_obs_ds[self.lon_str],
-                self.ungridded_obs_ds[self.lat_str],
+                self.ds[self.lon_str],
+                self.ds[self.lat_str],
                 self.xc_wm.ravel(),
                 self.yc_wm.ravel(),
                 nneighbours=self.num_interp_points,
@@ -236,7 +237,7 @@ class UngriddedObsPreprocessor:
                                       (1,) * (len(self.dims_interp) - tile_field_at_obs_point.ndim))
 
             # set interp field in dataset
-            self.ungridded_obs_ds[f'{self.interp_str}_interp_{tile_key}'] = (self.dims_interp, tile_field_at_obs_point)
+            self.ds[f'{self.interp_str}_interp_{tile_key}'] = (self.dims_interp, tile_field_at_obs_point)
 
             # save tile_fields
             self.tile_fields_wm = tile_fields_wm
@@ -260,5 +261,14 @@ class UngriddedObsPreprocessor:
         # convert from lat-lon to xyz
         # compute bilinear interp weights
         
-        self.ungridded_obs_ds[f'{self.interp_str}_interp_weights'] = (self.dims_interp, interp_weights)
-        
+        self.ds[f'{self.interp_str}_interp_weights'] = (self.dims_interp, interp_weights)
+
+    def get_obs_datetime(self, *args, **kwargs):
+        """
+        Set temporal metadata
+        """
+        ds =  get_obs_datetime(self.ds,
+                               *args,
+                               pkg_str=self.pkg_str,
+                               dims_obs=self.dims_obs,
+                               **kwargs)

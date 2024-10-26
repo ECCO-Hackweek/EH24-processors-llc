@@ -4,22 +4,22 @@ This package offers routines to help MITgcm users format ungridded datasets into
 
 .. code-block:: python
 
-    from obsprep.preproc import UngriddedObsPreprocessor
+    from obsprep import Prep
 
 profiles
 ~~~~~~~~
-Here is how to use the `UngriddedObsPreprocessor` with the 'profiles' package:
+Here is how to use the `Prep` with the 'profiles' package:
 
 .. code-block:: python
 
-     # grid_noblank_ds has fields XC and YC and was generated without blank tiles
-     UOP = UngriddedObsPreprocessor('profiles', grid_noblank_ds)
+     # grid_ds has fields XC and YC and was generated without blank tiles
+     OP = Prep('profiles', grid_ds)
 
 obsfit
 ~~~~~~
-Here is how to use the `UngriddedObsPreprocessor` with the 'obsfit' package:
+Here is how to use the `Prep` with the 'obsfit' package:
 
 .. code-block:: python
 
-    UOP = UngriddedObsPreprocessor('obsfit', grid_noblank_ds)
+    OP = Prep('obsfit', grid_ds)
 

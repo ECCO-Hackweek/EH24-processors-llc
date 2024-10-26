@@ -1,6 +1,7 @@
 _all__ = [
-    "utils","preproc","interp",
+    "utils","prep","interp",
 ]
+from .prep import Prep
 
 ## Add to __init__.py
 # from .prep import Prep

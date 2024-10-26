@@ -5,42 +5,51 @@ from datetime import datetime as dt
 def datenum(d):
     return 366 + d.toordinal() + (d - dt.fromordinal(d.toordinal())).total_seconds()/(24*60*60)
 
-def get_obs_datetime(ds, time_var, remove_original_time_field=False):
+def get_obs_datetime(ds, time_var, pkg_str, dims_obs, remove_original_time_field=False):
     """
     Get obsfit datetime fields
 
     Parameters
     ----------
-    ds: xarray.Dataset 
-    time_var: str
+    ds : xarray.Dataset 
+        the dataset containing observational data
+    time_var : str
         name of datetime dimension in ds
-    
+    pkg_str : str
+        prefix for datetime fields (e.g. 'obs' or 'prof')
+    dims_obs : list
+        dimensions of datetime fields (e.g. ['iOBS'] or ['iPROF'])
+    remove_original_time_field : bool
+        option to remove time_var field from ds
+
     Returns
     -------
     xarray.Dataset
         ds with added ObsFit datetime variables
     """
 
+    # generate time fields
     df = ds[time_var].to_dataframe()
+    date = pd.to_datetime(df[time_var]).apply(lambda x:datenum(x)).values
+    YYYYMMDD = df[time_var].apply(lambda x: int(x.strftime('%Y%m%d'))).values
+    HHMMSS = df[time_var].apply(lambda x: int(x.strftime('%H%M%S'))).values
 
-    obs_date = pd.to_datetime(df[time_var]).apply(lambda x:datenum(x)).values
-    obs_YYYYMMDD = df[time_var].apply(lambda x: int(x.strftime('%Y%m%d'))).values
-    obs_HHMMSS = df[time_var].apply(lambda x: int(x.strftime('%H%M%S'))).values
+    # store time info in dictionary
+    time_vars =  [f'{pkg_str}_{x}' for x in ['date', 'YYYYMMDD', 'HHMMSS']]
+    time_flds = [date, YYYYMMDD, HHMMSS]
+    time_dict = dict(zip(time_vars, time_flds))
 
-    ds['obs_date'] = ("iOBS", obs_date)
-    ds['obs_YYYYMMDD'] = ("iOBS", obs_YYYYMMDD)
-    ds['obs_HHMMSS'] = ("iOBS", obs_HHMMSS)
+    # add fields to dataset
+    for key, val in time_dict.items():
+        ds[key] = (dims_obs, val)
 
+    # reorder time fields to first
     variables = list(ds.data_vars.keys())
+    [variables.remove(x) for x in time_vars]
+    [variables.insert(1, x) for x in time_vars]
 
-    variables.remove('obs_HHMMSS')
-    variables.remove('obs_YYYYMMDD')
-    variables.remove('obs_date')
-    variables.insert(1, 'obs_HHMMSS')
-    variables.insert(1, 'obs_YYYYMMDD')
-    variables.insert(1, 'obs_date')
-
+    # remove time_var from dataset
     if remove_original_time_field:
-        variables.remove('obs_datetime')
+        variables.remove(time_var)
     
     return ds[variables]

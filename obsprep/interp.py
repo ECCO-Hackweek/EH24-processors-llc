@@ -1,7 +1,7 @@
 import pyresample as pr
 import numpy as np
 
-def get_interp_points(ungridded_lons, ungridded_lats,
+def get_interp_points(lons, lats,
                       grid_lon_wm_flat, grid_lat_wm_flat, nneighbours=4,
                       max_target_grid_radius = int(15e4), max_attempts=10, radius_factor=1.5,
                      ):
@@ -10,9 +10,9 @@ def get_interp_points(ungridded_lons, ungridded_lats,
 
     Parameters
     ----------
-    ungridded_lons : array-like
+    lons : array-like
         Longitudes of ungridded points.
-    ungridded_lats : array-like
+    lats : array-like
         Latitudes of ungridded points.
     grid_lon_wm_flat : array-like
         Longitudes of the source grid (flattened).
@@ -29,7 +29,7 @@ def get_interp_points(ungridded_lons, ungridded_lats,
         A tuple of (valid_input_index, valid_output_index, index_array, distance_array).
     """
     target_grid = pr.geometry.SwathDefinition(
-        lats=ungridded_lats, lons=ungridded_lons
+        lats=lats, lons=lons
     )
     
     source_grid = pr.geometry.SwathDefinition(

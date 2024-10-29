@@ -31,7 +31,6 @@ class Prep:
             raise ValueError(f"Invalid pkg '{pkg}'. Must be either 'profiles' or 'obsfit'.")
 
         self.pkg = pkg.lower()
-#        self.msk = grid_noblank_ds.mskC.where(grid_noblank_ds.mskC).isel(k=0).values
 
         self.ds = xr.Dataset() if ds is None else ds
             
@@ -141,6 +140,7 @@ class Prep:
 
         # add fields to ds
         self.interp_str = 'prof' if self.pkg_str == 'prof' else 'sample'
+        self.interp_sfx = 'weights' if self.pkg_str == 'prof' else 'frac'
         self.obs_point_str = f'{self.interp_str}_point'
 
         if self.obs_points.ndim == 1:
@@ -261,7 +261,7 @@ class Prep:
         # convert from lat-lon to xyz
         # compute bilinear interp weights
         
-        self.ds[f'{self.interp_str}_interp_weights'] = (self.dims_interp, interp_weights)
+        self.ds[f'{self.interp_str}_interp_{self.interp_sfx}'] = (self.dims_interp, interp_weights)
 
     def get_obs_datetime(self, *args, **kwargs):
         """

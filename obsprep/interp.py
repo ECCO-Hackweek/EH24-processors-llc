@@ -39,12 +39,18 @@ def get_interp_points(lons, lats,
     invalid_search = True
     attempt = 0
 
+    if nneighbours == 8:
+        n_search = 4
+    else:
+        n_search = nneighbours
+
     while (invalid_search) & (attempt < max_attempts):
       valid_input_index, valid_output_index, index_array, distance_array = pr.kd_tree.get_neighbour_info(
           source_grid,
           target_grid,
           radius_of_influence=int(max_target_grid_radius),
-          neighbours=nneighbours,
+          #neighbours=nneighbours,
+          neighbours=n_search,
       )
 
       # invalid interp points show up as having inf distance
@@ -57,6 +63,13 @@ def get_interp_points(lons, lats,
 
     # edge case: kdtree can return grid_lon_wm_flat.size as a valid index
     index_array[index_array == grid_lon_wm_flat.size] -= 1
+
+    if nneighbours == 8:
+        valid_input_index = np.tile(valid_input_index,2)
+        valid_output_index = np.tile(valid_output_index, 2)
+        index_array = np.tile(index_array, 2)
+        distance_array = np.tile(distance_array, 2)
+        
 
     return (valid_input_index, valid_output_index, index_array, distance_array, max_target_grid_radius)
     
@@ -80,6 +93,8 @@ def get_depth_indices(rC, depth_cur):
         A tuple of (sample_k1, sample_k2, depth_fac)
     """
 
+    Nr = len(rC)
+    
     sample_k1 = np.zeros_like(depth_cur)#, dtype=int)
     sample_k2 = np.zeros_like(depth_cur)#, dtype=int)
     depth_fac = np.zeros_like(depth_cur)#, dtype=float)
@@ -108,3 +123,35 @@ def get_depth_indices(rC, depth_cur):
         depth_fac[mask_between_k] = (depth_cur[mask_between_k] - depth_1) / (depth_2 - depth_1)
 
     return (sample_k1, sample_k2, depth_fac)
+
+
+def get_sample_interp_k(rC, depth_cur, num_interp_points):
+
+    """
+    Use number of interpolation points to determine if one or two vertical levels should be used.
+
+    Parameters
+    ----------
+    rC : array-like
+        depths of vertical layers in model (negative values)
+    depth_cur : array-like
+        depths of ungridded points (positive values)
+  
+    Returns
+    -------
+    1D array
+        An array of sample_interp_k
+    """
+
+    sample_k1, sample_k2, depth_fac = get_depth_indices(rC, depth_cur)
+
+    if num_interp_points == 8:
+        sample_interp_k = np.hstack((np.tile(sample_k1[:, None], (1, 4)), np.tile(sample_k2[:, None], (1, 4))))
+    else:
+        which_k = np.where(depth_fac < 0.5, sample_k1, sample_k2)
+        sample_interp_k = np.repeat(which_k[:, np.newaxis], num_interp_points, axis=1)
+
+    return sample_interp_k
+
+
+

@@ -35,8 +35,8 @@ def get_obs_datetime(ds, time_var, pkg_str, dims_obs, remove_original_time_field
     HHMMSS = df[time_var].apply(lambda x: int(x.strftime('%H%M%S'))).values
 
     # store time info in dictionary
-    time_vars =  [f'{pkg_str}_{x}' for x in ['date', 'YYYYMMDD', 'HHMMSS']]
-    time_flds = [date, YYYYMMDD, HHMMSS]
+    time_vars =  [f'{pkg_str}_{x}' for x in ['HHMMSS', 'YYYYMMDD', 'date']]
+    time_flds = [HHMMSS, YYYYMMDD, date]
     time_dict = dict(zip(time_vars, time_flds))
 
     # add fields to dataset

@@ -2,7 +2,7 @@ import copy
 import xarray as xr
 import numpy as np
 from ecco_v4_py.llc_array_conversion import llc_tiles_to_faces, llc_tiles_to_compact
-from obsprep.utils import patchface3D_5f_to_wrld, compact2worldmap
+from obsprep.utils import patchface3D_5f_to_wrld, compact2worldmap, get_sample_type
 from obsprep.interp import *
 from obsprep.time_utils import get_obs_datetime
 
@@ -45,11 +45,11 @@ class Prep:
         
         # Combine dimensions for spatial fields, including depth if applicable
         self.dims_spatial = self.dims_obs + self.dims_depth * (len(self.dims_depth[0]) > 0)
-        self.lon_str, self.lat_str = tuple([f'{self.dims_obs[0][1:].lower()}_{x}' for x in ['lon', 'lat']])
+        self.lon_str, self.lat_str, self.depth_str = tuple([f'{self.dims_obs[0][1:].lower()}_{x}' for x in ['lon', 'lat', 'depth']])
 
 
-    def get_obs_point(self, lons=None, lats=None, 
-                                grid_type='sphericalpolar', grid_noblank_ds=None,
+    def get_obs_point(self, lons=None, lats=None, depths=None,
+                                grid_type='sphericalpolar', grid_ds=None,
                                 num_interp_points=1, sNx=30, sNy=30, max_target_grid_radius=None,
                                ):
         """
@@ -63,10 +63,10 @@ class Prep:
             List of latitudes for observation points.
         grid_type : str, optional
             The type of grid being used ('sphericalpolar', 'llc', or 'cubedsphere').
-        grid_noblank_ds : xarray.Dataset, optional
+        grid_ds : xarray.Dataset, optional
             Dataset containing grid information without blanks (must have fields XC and YC).
         num_interp_points : int, optional
-            Number of interpolation points to consider (default is 1).
+            Number of interpolation points to consider (default is 1; only 1, 4, and 8 are supported).
         sNx: int, optional
             The size of the MPI-partition tiles in the x-direction (default is 30).
         sNy: int, optional
@@ -82,6 +82,7 @@ class Prep:
         self.sNy = sNy
         ds_has_lon = f'{self.lon_str}' in self.ds.keys()
         ds_has_lat = f'{self.lat_str}' in self.ds.keys()
+        ds_has_depth = f'{self.depth_str}' in self.ds.keys()
 
         if (ds_has_lon) & (ds_has_lat):
             if grid_type == 'sphericalpolar':
@@ -92,6 +93,8 @@ class Prep:
             raise ValueError(f"longitudes not provided")
         if (lats is None) & (not ds_has_lat):
             raise ValueError(f"latitudes not provided")
+        if (depths is None) & (not ds_has_depth) & (self.pkg_str != 'obs') & (num_interp_points == 8):
+            raise ValueError(f"depths not provided")
             
         if not ds_has_lon:
             if len(lons) == 0:
@@ -103,6 +106,11 @@ class Prep:
                 lats = [lats]
             self.ds[self.lat_str] = (self.dims_obs, lats)
 
+        if (not ds_has_depth) and (num_interp_points == 8):
+            if len(depths) == 0:
+                depths = [depths]
+            self.ds[self.depth_str] = (self.dims_obs, depths)
+
         if grid_type == 'sphericalpolar':
             return
             
@@ -110,16 +118,22 @@ class Prep:
             raise ValueError(f"Invalid grid_type: '{grid_type}'. Options supported are 'sphericalpolar', 'llc', or 'cubedsphere'.")
 
         # grid_type is llc or curvilinear
-        if grid_noblank_ds is not None:
-            if 'XC' not in list(grid_noblank_ds.coords) or 'YC' not in list(grid_noblank_ds.coords):
-                raise ValueError(f"grid_noblank_ds must have fields XC and YC.")
+        if grid_ds is not None:
+            if 'XC' not in list(grid_ds.coords) or 'YC' not in list(grid_ds.coords):
+                raise ValueError(f"grid_ds must have fields XC and YC.")
         else:
-                raise ValueError("provide grid_noblank_ds")
+                raise ValueError("provide grid_ds")
+
+        if (num_interp_points not in [1, 4]) & (self.pkg_str == 'prof'):
+            raise ValueError(f"Invalid num_interp_points '{num_interp_points}'. Must be either 1 or 4 for pkg/profiles.")
+        elif (num_interp_points not in [1, 4, 8]) & (self.pkg_str == 'obs'):
+            raise ValueError(f"Invalid num_interp_points '{num_interp_points}'. Must be either 1, 4, or 8 for pkg/obsfit.")
             
         # add attributes relevant to interpolation field creation
-        self.xc = grid_noblank_ds.XC.values
-        self.yc = grid_noblank_ds.YC.values
-        self.mask = grid_noblank_ds.hFacC.where(grid_noblank_ds.hFacC).isel(k=0).values
+        self.xc = grid_ds.XC.values
+        self.yc = grid_ds.YC.values
+        self.rc = grid_ds.Z.values
+        self.mask = grid_ds.hFacC.where(grid_ds.hFacC).isel(k=0).values
 
         # same xc, yc in worldmap form for later        
         nx = len(self.xc[0, 0, :]) # (last two dimensions of xc with shape (ntile, nx, nx)
@@ -129,14 +143,15 @@ class Prep:
         
         # set nearest neighbours search radius
         if max_target_grid_radius == None:
-            max_target_grid_radius = np.max(np.abs([grid_noblank_ds.dxG.values, grid_noblank_ds.dyG.values]))
+            max_target_grid_radius = np.max(np.abs([grid_ds.dxG.values, grid_ds.dyG.values]))
         self.max_target_grid_radius = max_target_grid_radius
 
-        self.num_interp_points = num_interp_points        
+        self.num_interp_points = num_interp_points
+        
         self.dims_interp = self.dims_obs + ['iINTERP']
 
         # run interpolation routine
-        self.obs_points = self.interp()
+        self.obs_points = self.interp() # indices in WM view 
 
         # add fields to ds
         self.interp_str = 'prof' if self.pkg_str == 'prof' else 'sample'
@@ -145,10 +160,11 @@ class Prep:
 
         if self.obs_points.ndim == 1:
             self.obs_points = self.obs_points[:, None]
+        
         self.ds[self.obs_point_str] = (self.dims_interp, self.obs_points)
 
         # add grid interp fields
-        self.get_sample_interp_info()
+        self.get_sample_interp_info() 
 
     def interp(self):
         """
@@ -159,7 +175,8 @@ class Prep:
         index_array : ndarray
             Array containing indices of the nearest grid points for the given observation points.
         """
-        # turn from tiles to worldmap                
+        
+        # turn from tiles to worldmap   
         valid_input_index, valid_output_index, index_array, distance_array, max_target_grid_radius =\
             get_interp_points(
                 self.ds[self.lon_str],
@@ -167,6 +184,7 @@ class Prep:
                 self.xc_wm.ravel(),
                 self.yc_wm.ravel(),
                 nneighbours=self.num_interp_points,
+                #nneighbours=nn,
                 max_target_grid_radius=self.max_target_grid_radius
             )
         self.interp_distance = distance_array
@@ -234,7 +252,7 @@ class Prep:
             #                   set sample_interp_weight np.ones
             #                   this is encoded in len(self.dims_interp)
             tile_field_at_obs_point = tile_field_at_obs_point.reshape(tile_field_at_obs_point.shape +\
-                                      (1,) * (len(self.dims_interp) - tile_field_at_obs_point.ndim))
+                                           (1,) * (len(self.dims_interp) - tile_field_at_obs_point.ndim))
 
             # set interp field in dataset
             self.ds[f'{self.interp_str}_interp_{tile_key}'] = (self.dims_interp, tile_field_at_obs_point)
@@ -242,6 +260,11 @@ class Prep:
             # save tile_fields
             self.tile_fields_wm = tile_fields_wm
 
+        # set interp_k field in dataset
+        if self.pkg_str == 'obs': 
+            sample_interp_k = get_sample_interp_k(self.rc, self.ds[self.depth_str], self.num_interp_points)
+            self.ds[f'{self.interp_str}_interp_k'] = (self.dims_interp, sample_interp_k)
+        
         self.get_interp_weights()
 
     def get_interp_weights(self):
@@ -267,8 +290,16 @@ class Prep:
         """
         Set temporal metadata
         """
-        ds =  get_obs_datetime(self.ds,
+        self.ds =  get_obs_datetime(self.ds,
                                *args,
                                pkg_str=self.pkg_str,
                                dims_obs=self.dims_obs,
+                               **kwargs)
+
+    def get_sample_type(self, *args, **kwargs):
+        """
+        Set field
+        """
+        self.ds =  get_sample_type(self.ds,
+                               *args,
                                **kwargs)

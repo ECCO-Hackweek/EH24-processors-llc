@@ -13,6 +13,7 @@ def mock_dataset():
         coords={
             'XC': (('tile','j', 'i'), np.random.rand(13, 90, 90)),
             'YC': (('tile','j', 'i'), np.random.rand(13, 90, 90)),
+            'Z': (('k'), np.random.rand(50)),
             'dxG': (('tile','j', 'i'), np.random.rand(13, 90, 90)),
             'dyG': (('tile','j', 'i'), np.random.rand(13, 90, 90)),
             'hFacC': (('k', 'tile','j', 'i'), np.random.rand(50, 13, 90, 90)),
@@ -49,7 +50,7 @@ def test_get_pkg_fields_obsfit():
 def test_get_obs_point_with_valid_coords(mock_dataset):
     """Test get_obs_point with valid coordinates."""
     prep = Prep(pkg='profiles')
-    prep.get_obs_point([0.5], [0.5], grid_noblank_ds=mock_dataset)
+    prep.get_obs_point([0.5], [0.5], grid_ds=mock_dataset)
 
     # Check if expected fields are created in dataset
     assert 'prof_lon' in prep.ds
@@ -57,7 +58,7 @@ def test_get_obs_point_with_valid_coords(mock_dataset):
 
 def test_get_obs_point_llc_coords(mock_dataset):
     prep = Prep(pkg='profiles')
-    prep.get_obs_point([0.5], [0.5], grid_type='llc', grid_noblank_ds=mock_dataset)
+    prep.get_obs_point([0.5], [0.5], grid_type='llc', grid_ds=mock_dataset)
 
     # Check if expected fields are created in dataset
     assert prep.ds['prof_point'].values.shape == (1,1)

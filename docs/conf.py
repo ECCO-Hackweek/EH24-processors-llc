@@ -18,6 +18,9 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',  # For Google style docstrings
+#    'readthedocs_ext.readthedocs',
+    'sphinx.ext.todo',
+#    'sphinx_toolbox.more_autodoc',
 ]
 autodoc_default_options = {
     'members': True,

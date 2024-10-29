@@ -2,24 +2,18 @@ Introduction
 ============
 This package offers routines to help MITgcm users format ungridded datasets into objects readable by ``pkg/profiles`` and ``pkg/obsfit`` using ``xarray``. In particular, ``obsprep`` automates certain routines related to gridding and interpolation parameters.
 
-.. code-block:: python
+Requirements
+^^^^^^^^^^^^
 
-    from obsprep import Prep
+obsprep is compatible with python 3 (>= version 3.11).
 
-profiles
-~~~~~~~~
-Here is how to use the `Prep` with the 'profiles' package:
+Installation from GitHub
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: python
+obsprep is under active development. To obtain the latest development version, you may clone the `source repository <https://github.com/ECCO-Hackweek/EH24-processors-llc/>`_ and install it::
 
-     # grid_ds has fields XC and YC and was generated without blank tiles
-     OP = Prep('profiles', grid_ds)
+    git clone https://github.com/ECCO-Hackweek/EH24-processors-llc.git
+    cd EH24-processors-llc/obsprep
+    python setup.py install
 
-obsfit
-~~~~~~
-Here is how to use the `Prep` with the 'obsfit' package:
-
-.. code-block:: python
-
-    OP = Prep('obsfit', grid_ds)
 

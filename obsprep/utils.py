@@ -1,9 +1,10 @@
 import numpy as np
 
-def generate_random_points(nobs, lon_range=(-180, 180), lat_range=(-90, 90)):
+def generate_random_points(nobs, lon_range=(-180, 180), lat_range=(-90, 90), depth_range=(0, 500)):
     lons = np.random.uniform(low=lon_range[0], high=lon_range[1], size=nobs)
     lats = np.random.uniform(low=lat_range[0], high=lat_range[1], size=nobs)
-    return lons, lats
+    depths = np.random.uniform(low=depth_range[0], high=depth_range[1], size=nobs)
+    return lons, lats, depths
 
 def patchface3D_5f_to_wrld(faces):
     # Extract dimensions from one of the faces
@@ -147,21 +148,22 @@ def patchface3D(fldin,nx,nz):
 
     return a
 
-
 def get_sample_type(ds, fld):
 
-    if fld == 'T':
-        fac = 1
-    elif fld == 'S':
-        fac = 2
-    elif fld == 'U':
-        fac = 3
-    elif fld == 'V':
-        fac = 4
-    elif fld == 'SSH':
-        fac = 5
+    # Map field types to factors
+    factor_map = {
+        'T': 1,
+        'S': 2,
+        'U': 3,
+        'V': 4,
+        'SSH': 5
+    }
 
-    ds['sample_type'] = ("iSAMPLE", fac * np.ones_like(ds.sample_lat.values) )
+    # Get the factor using the dictionary, default to 0 if fld is not found
+    fac = factor_map.get(fld, 0)
+
+    # Create the sample_type variable
+    sample_type = (fac * np.ones_like(ds.sample_lat.values)).astype(int)
+    ds['sample_type'] = ("iSAMPLE", sample_type) 
 
     return ds
-

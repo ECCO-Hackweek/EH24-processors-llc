@@ -72,6 +72,8 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 **/*.ipynb
+!tutorials/obsprep_tutorial.ipynb
+
 
 # pyenv
 .python-version
@@ -109,6 +111,8 @@ venv.bak/
 *.hdf
 *.hdf5
 *.nc
+!datasets/ECCO_llc90.nc
+!datasets/obsfit_llc_example.nc
 *.tif
 **/__pycache__
 **/ecco_access

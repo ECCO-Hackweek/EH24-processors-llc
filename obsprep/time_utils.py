@@ -28,6 +28,9 @@ def get_obs_datetime(ds, time_var, pkg_str, dims_obs, remove_original_time_field
         ds with added ObsFit datetime variables
     """
 
+    if time_var not in ds.keys():
+        raise ValueError(f"Datetime dimension '{time_var}' not in dataset.")
+
     # generate time fields
     df = ds[time_var].to_dataframe()
     date = pd.to_datetime(df[time_var]).apply(lambda x:datenum(x)).values

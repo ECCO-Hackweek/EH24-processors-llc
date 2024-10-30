@@ -39,18 +39,18 @@ def get_interp_points(lons, lats,
     invalid_search = True
     attempt = 0
 
-    if nneighbours == 8:
-        n_search = 4
-    else:
-        n_search = nneighbours
+    # if nneighbours == 8:
+    #     n_search = 4
+    # else:
+    #     n_search = nneighbours
 
     while (invalid_search) & (attempt < max_attempts):
       valid_input_index, valid_output_index, index_array, distance_array = pr.kd_tree.get_neighbour_info(
           source_grid,
           target_grid,
           radius_of_influence=int(max_target_grid_radius),
-          #neighbours=nneighbours,
-          neighbours=n_search,
+          neighbours=nneighbours,
+          #neighbours=n_search,
       )
 
       # invalid interp points show up as having inf distance
@@ -64,11 +64,11 @@ def get_interp_points(lons, lats,
     # edge case: kdtree can return grid_lon_wm_flat.size as a valid index
     index_array[index_array == grid_lon_wm_flat.size] -= 1
 
-    if nneighbours == 8:
-        valid_input_index = np.tile(valid_input_index,2)
-        valid_output_index = np.tile(valid_output_index, 2)
-        index_array = np.tile(index_array, 2)
-        distance_array = np.tile(distance_array, 2)
+    # if nneighbours == 8:
+    #     valid_input_index = np.tile(valid_input_index,2)
+    #     valid_output_index = np.tile(valid_output_index, 2)
+    #     index_array = np.tile(index_array, 2) # nearest grid index
+    #     distance_array = np.tile(distance_array, 2)
         
 
     return (valid_input_index, valid_output_index, index_array, distance_array, max_target_grid_radius)

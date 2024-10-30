@@ -133,13 +133,21 @@ class Prep:
         self.xc = grid_ds.XC.values
         self.yc = grid_ds.YC.values
         self.rc = grid_ds.Z.values
-        self.mask = grid_ds.hFacC.where(grid_ds.hFacC).isel(k=0).values
+        self.maskc = grid_ds.maskC.values
+        self.maskw = grid_ds.maskW.values
+        self.masks = grid_ds.maskS.values
+       # self.mask = grid_ds.hFacC.where(grid_ds.hFacC).isel(k=0).values
 
         # same xc, yc in worldmap form for later        
         nx = len(self.xc[0, 0, :]) # (last two dimensions of xc with shape (ntile, nx, nx)
+        self.nz = len(self.rc)
         self.xc_wm = compact2worldmap(llc_tiles_to_compact(self.xc, less_output=True), nx, 1)[0, :, :]
         self.yc_wm = compact2worldmap(llc_tiles_to_compact(self.yc, less_output=True), nx, 1)[0, :, :]
-        self.mask_wm = compact2worldmap(llc_tiles_to_compact(self.mask, less_output=True), nx, 1)[0, :, :]
+        self.maskc_wm = compact2worldmap(llc_tiles_to_compact(self.maskc, less_output=True), nx, self.nz)
+        self.maskw_wm = compact2worldmap(llc_tiles_to_compact(self.maskw, less_output=True), nx, self.nz)
+        self.masks_wm = compact2worldmap(llc_tiles_to_compact(self.masks, less_output=True), nx, self.nz)
+        
+       # self.mask_wm = compact2worldmap(llc_tiles_to_compact(self.mask, less_output=True), nx, 1)[0, :, :]
         
         # set nearest neighbours search radius
         if max_target_grid_radius == None:
@@ -147,6 +155,7 @@ class Prep:
         self.max_target_grid_radius = max_target_grid_radius
 
         self.num_interp_points = num_interp_points
+        self.nneighbours_horizontal = min(self.num_interp_points, 4)
         
         self.dims_interp = self.dims_obs + ['iINTERP']
 
@@ -183,10 +192,17 @@ class Prep:
                 self.ds[self.lat_str],
                 self.xc_wm.ravel(),
                 self.yc_wm.ravel(),
-                nneighbours=self.num_interp_points,
-                #nneighbours=nn,
+                #nneighbours=self.num_interp_points,
+                nneighbours=self.nneighbours_horizontal,
                 max_target_grid_radius=self.max_target_grid_radius
             )
+        
+        if self.num_interp_points == 8:
+            valid_input_index = np.tile(valid_input_index,2)
+            valid_output_index = np.tile(valid_output_index, 2)
+            index_array = np.tile(index_array, 2) # nearest grid index
+            distance_array = np.tile(distance_array, 2)
+            
         self.interp_distance = distance_array
         self.max_target_grid_radius = max_target_grid_radius
         
@@ -264,20 +280,59 @@ class Prep:
         if self.pkg_str == 'obs': 
             sample_interp_k = get_sample_interp_k(self.rc, self.ds[self.depth_str], self.num_interp_points)
             self.ds[f'{self.interp_str}_interp_k'] = (self.dims_interp, sample_interp_k)
-        
+
+        self.get_sample_type 
         self.get_interp_weights()
 
     def get_interp_weights(self):
         """ 
         Set interpolation weights
         """
+        
+        # find land points
+        # is_land = np.zeros((self.nz, self.nneighbours_horizontal, len(self.ds.iSAMPLE)))
+        # if sample_type == 3:
+        #     mask = self.maskw
+        # elif sample_type == 4:
+        #     mask = self.masks
+        # else:
+        #     mask = self.maskc
+        # for k in range(self.nz):
+        #     is_land[k,:,:] = mask[k,:,:].ravel()[self.obs_points]
+        
+            
+        # has size [num_interp by num_samples]
+    #if (is_land.sum(axis=0) < num_interp): # for a given sample, did any of the nearest points end up on land?
+        # do weighting routine with as many points as we have left
+        
+    
+        
+        
         print('Warning: currently only supported inverse distance weighting')
         inv_dist = 1 / self.interp_distance
         if inv_dist.ndim == 1:
             inv_dist = np.expand_dims(inv_dist, axis=1)
 
         interp_weights = inv_dist / np.sum(inv_dist, axis=1, keepdims=True)
-        # if self.num_interp_points == 4:
+
+        
+        # if self.num_interp_points == 1:
+        #     interp_weights = np.ones_like(self.interp_distance)
+            
+        # elif self.num_interp_points == 4:
+        #     # bilinear interpolation
+        #     lon_cur = self.ds[self.lon_str]
+        #     lat_cur = self.ds[self.lat_str]
+            
+        #     lon_fac=(lon_cur-lon_1)/(lon_2-lon_1)
+        #     lat_fac=(lat_cur-lat_1)/(lat_2-lat_1)
+            
+        #     interp_weights = lon_fac * lat_fac
+            
+        # elif self.num_interp_points == 8:
+        #     # trilinear interpolation
+        #     interp_weights = lon_fac * lat_fac * depth_fac
+        
         # self.method = 'bilinear'
         
         # compute interp_weights from obs_points

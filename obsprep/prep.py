@@ -106,9 +106,13 @@ class Prep:
                 lats = [lats]
             self.ds[self.lat_str] = (self.dims_obs, lats)
 
-        if (not ds_has_depth) and (num_interp_points == 8):
-            if len(depths) == 0:
-                depths = [depths]
+        if (not ds_has_depth):
+            if depths is not None:
+              if len(depths) == 0:
+                  depths = [depths]
+            else:
+                print('Depth not provided. Assuming surface data.')
+                depths = [0] * len(lons)
             self.ds[self.depth_str] = (self.dims_obs, depths)
 
         if grid_type == 'sphericalpolar':
@@ -136,7 +140,6 @@ class Prep:
         self.maskc = grid_ds.maskC.values
         self.maskw = grid_ds.maskW.values
         self.masks = grid_ds.maskS.values
-       # self.mask = grid_ds.hFacC.where(grid_ds.hFacC).isel(k=0).values
 
         # same xc, yc in worldmap form for later        
         nx = len(self.xc[0, 0, :]) # (last two dimensions of xc with shape (ntile, nx, nx)

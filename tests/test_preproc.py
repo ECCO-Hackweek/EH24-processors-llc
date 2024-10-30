@@ -16,7 +16,9 @@ def mock_dataset():
             'Z': (('k'), np.random.rand(50)),
             'dxG': (('tile','j', 'i'), np.random.rand(13, 90, 90)),
             'dyG': (('tile','j', 'i'), np.random.rand(13, 90, 90)),
-            'hFacC': (('k', 'tile','j', 'i'), np.random.rand(50, 13, 90, 90)),
+            'maskC': (('k', 'tile','j', 'i'), np.random.rand(50, 13, 90, 90)),
+            'maskS': (('k', 'tile','j', 'i'), np.random.rand(50, 13, 90, 90)),
+            'maskW': (('k', 'tile','j', 'i'), np.random.rand(50, 13, 90, 90)),
         }
     )
     return dataset_llc

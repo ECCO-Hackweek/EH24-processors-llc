@@ -1,10 +1,83 @@
 import numpy as np
+from xmitgcm.llcreader.llcmodel import faces_dataset_to_latlon 
 
 def generate_random_points(nobs, lon_range=(-180, 180), lat_range=(-90, 90), depth_range=(0, 500)):
     lons = np.random.uniform(low=lon_range[0], high=lon_range[1], size=nobs)
     lats = np.random.uniform(low=lat_range[0], high=lat_range[1], size=nobs)
     depths = np.random.uniform(low=depth_range[0], high=depth_range[1], size=nobs)
     return lons, lats, depths
+
+def faces_dataset_to_latlon_pole(ds):
+    """
+    Convert a 13-faces llc dataset to a latitude-longitude dataset format and handle polar transformations.
+
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The input dataset contains fields with 13-face horizontal spatial dimensions.
+        This dataset is assumed to have coordinate dimensions 'i', 'j', 'i_g', and 'j_g'
+
+    Returns
+    -------
+    xarray.Dataset
+        A new dataset with coordinates transformed to a latitude-longitude coordinate system. The polar face is
+        rotated and placed above Europe.
+
+    """
+
+    nx = len(ds.i)
+
+    # use xmitgcm's faces_dataset_to_latlon, which does everything except format the pole
+    ds_latlon = faces_dataset_to_latlon(ds)
+
+    # pad above so that the fields in the dataset are shape (4*nx, 4*nx)
+    ds_latlon = ds_latlon.pad(j=(0, nx), j_g=(0, nx), constant_values=0).sortby(["j", "j_g"])
+    ds_latlon = ds_latlon.assign_coords(j=np.arange(4*nx), j_g=np.arange(4*nx))
+    target_slice = ds_latlon.isel(j=slice(3*nx, None), i=slice(None, nx),
+                                 j_g=slice(3*nx, None), i_g=slice(None, nx))
+
+    # Get pole subset of dataset
+    pole = ds.isel(face=6)
+    
+    # Reassign horizontal coordinates
+    pole = pole.assign_coords({
+        'i': np.arange(nx),
+        'j': np.arange(3*nx, 4*nx),
+        'i_g': np.arange(nx),
+        'j_g': np.arange(3*nx, 4*nx),
+    })
+
+    # loop through coordinates, adding pole and rotating
+    dims = pole.dims
+    
+    for coord in pole.coords:
+        if coord in pole.dims:
+            continue
+        coord_dims = pole[coord].dims
+    
+        if 'i' in pole[coord].dims or 'j' in pole[coord].dims or \
+           'i_g' in pole[coord].dims or 'j_g' in pole[coord].dims:
+
+            i_dim = next((dim for dim in coord_dims if 'i' in dim.lower()), None)
+            j_dim = next((dim for dim in coord_dims if 'j' in dim.lower()), None)
+            extra_dims = [dim for dim in dims if dim not in {j_dim, i_dim}]
+
+            # reassign coords
+            target_slice = target_slice.assign_coords({coord: pole[coord]})
+    
+            # rotate the pole: transpose, then flip along j_dim, leaving other dimensions intact
+            target_slice = target_slice.transpose(*extra_dims, i_dim, j_dim).isel({j_dim: slice(None, None, -1)})
+            target_slice = target_slice.rename({j_dim: i_dim, i_dim: j_dim})
+            target_slice = target_slice.assign_coords({i_dim: pole.i, j_dim: pole.j})
+        else:
+            continue
+
+        # store pole coord in ds_latlon[coord]
+        ds_latlon[coord].loc[dict({j_dim: slice(3*nx, None), i_dim:slice(None, nx-1)})] = target_slice[coord]
+
+    return ds_latlon
+
 
 def patchface3D_5f_to_wrld(faces):
     # Extract dimensions from one of the faces

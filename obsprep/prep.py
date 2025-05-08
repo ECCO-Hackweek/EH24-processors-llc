@@ -106,6 +106,7 @@ class Prep:
                 lats = [lats]
             self.ds[self.lat_str] = (self.dims_obs, lats)
 
+
         if (not ds_has_depth):
             if depths is not None:
               if len(depths) == 0:
@@ -132,6 +133,10 @@ class Prep:
             raise ValueError(f"Invalid num_interp_points '{num_interp_points}'. Must be either 1 or 4 for pkg/profiles.")
         elif (num_interp_points not in [1, 4, 8]) & (self.pkg_str == 'obs'):
             raise ValueError(f"Invalid num_interp_points '{num_interp_points}'. Must be either 1, 4, or 8 for pkg/obsfit.")
+
+        # set lon to [-180, 180]
+        self.ds[self.lon_str] = ((self.ds[self.lon_str] + 180) % 360) - 180
+        print('Warning: mapping lons to [-180, 180]')
             
         # add attributes relevant to interpolation field creation
         self.xc = grid_ds.XC.values

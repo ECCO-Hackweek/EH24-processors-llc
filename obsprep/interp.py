@@ -2,7 +2,7 @@ import pyresample as pr
 import numpy as np
 
 def get_interp_points(lons, lats,
-                      grid_lon_wm_flat, grid_lat_wm_flat, nneighbours=4,
+                      grid_lon_flat, grid_lat_flat, nneighbours=4,
                       max_target_grid_radius = int(15e4), max_attempts=10, radius_factor=1.5,
                      ):
     """
@@ -14,9 +14,9 @@ def get_interp_points(lons, lats,
         Longitudes of ungridded points.
     lats : array-like
         Latitudes of ungridded points.
-    grid_lon_wm_flat : array-like
+    grid_lon_flat : array-like
         Longitudes of the source grid (flattened).
-    grid_lat_wm_flat : array-like
+    grid_lat_flat : array-like
         Latitudes of the source grid (flattened).
     nneighbours : int, optional
         Number of nearest neighbours to find (default is 4).
@@ -33,16 +33,11 @@ def get_interp_points(lons, lats,
     )
     
     source_grid = pr.geometry.SwathDefinition(
-        lons=grid_lon_wm_flat, lats=grid_lat_wm_flat
+        lons=grid_lon_flat, lats=grid_lat_flat
     )
 
     invalid_search = True
     attempt = 0
-
-    # if nneighbours == 8:
-    #     n_search = 4
-    # else:
-    #     n_search = nneighbours
 
     while (invalid_search) & (attempt < max_attempts):
       valid_input_index, valid_output_index, index_array, distance_array = pr.kd_tree.get_neighbour_info(
@@ -61,15 +56,8 @@ def get_interp_points(lons, lats,
     if attempt == max_attempts:
         raise ValueError(f"Couldn't find valid interp points in {max_attempts} attempts")
 
-    # edge case: kdtree can return grid_lon_wm_flat.size as a valid index
-    index_array[index_array == grid_lon_wm_flat.size] -= 1
-
-    # if nneighbours == 8:
-    #     valid_input_index = np.tile(valid_input_index,2)
-    #     valid_output_index = np.tile(valid_output_index, 2)
-    #     index_array = np.tile(index_array, 2) # nearest grid index
-    #     distance_array = np.tile(distance_array, 2)
-        
+    # edge case: kdtree can return grid_lon_flat.size as a valid index
+    index_array[index_array == grid_lon_flat.size] -= 1
 
     return (valid_input_index, valid_output_index, index_array, distance_array, max_target_grid_radius)
     

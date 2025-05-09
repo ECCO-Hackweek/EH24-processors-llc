@@ -1,6 +1,7 @@
 import copy
 import xarray as xr
 import numpy as np
+import os
 from ecco_v4_py.llc_array_conversion import llc_tiles_to_faces, llc_faces_to_tiles
 from obsprep.utils import *
 from obsprep.interp import *
@@ -372,3 +373,31 @@ class Prep:
         self.ds =  get_sample_type(self.ds,
                                *args,
                                **kwargs)
+
+    def write(self, path=None, ds_name=None, separate_interp=True ):
+        """
+        Write out xarray dataset to NetCDF.
+    
+        Parameters
+        ----------
+        path : str, optional
+            Directory to save the dataset. Defaults to current directory.
+        ds_name : str, optional
+            Filename to save the dataset. Defaults to 'obsprep_interp_fields.nc'.
+        separate_interp : bool, default: True
+            If True, write only interpolation-related fields; otherwise, write the full dataset.
+        """
+        # Set defaults
+        if path is None:
+            path = "."
+        if ds_name is None:
+            ds_name = "obsprep_interp_fields.nc"
+
+
+        output_path = os.path.join(path, ds_name)
+        
+        if separate_interp:
+            filtered_ds = self.ds[[var for var in self.ds.data_vars if var.startswith('sample_interp') or var.startswith('sample_point')]]
+            filtered_ds.to_netcdf(output_path)
+        else:
+            self.ds.to_netcdf(output_path)

@@ -223,20 +223,43 @@ def patchface3D(fldin,nx,nz):
 
 def get_sample_type(ds, fld):
 
-    # Map field types to factors
-    factor_map = {
-        'T': 1,
-        'S': 2,
-        'U': 3,
-        'V': 4,
-        'SSH': 5
-    }
-
     # Get the factor using the dictionary, default to 0 if fld is not found
-    fac = factor_map.get(fld, 0)
+    fac = field_map.get(fld, 0)
 
     # Create the sample_type variable
     sample_type = (fac * np.ones_like(ds.sample_lat.values)).astype(int)
     ds['sample_type'] = ("iSAMPLE", sample_type) 
 
     return ds
+
+
+grid_map = {
+    'C': {'grid_lon': 'XC', 'grid_lat': 'YC', 'mask': 'maskC'},
+    'W': {'grid_lon': 'XG', 'grid_lat': 'YC', 'mask': 'maskW'},
+    'S': {'grid_lon': 'XC', 'grid_lat': 'YG', 'mask': 'maskS'},
+}
+
+field_data = {
+    'T': {'sample_type': 1, 'mask_sfx': 'C'},
+    'S': {'sample_type': 2, 'mask_sfx': 'C'},
+    'U': {'sample_type': 3, 'mask_sfx': 'W'},
+    'V': {'sample_type': 4, 'mask_sfx': 'S'},
+    'SSH': {'sample_type': 5, 'mask_sfx': 'C'}
+}
+
+field_map = {
+    field: {
+        'sample_type': data['sample_type'],
+        'mask': grid_map[data['mask_sfx']]['mask'],
+        'grid_lon': grid_map[data['mask_sfx']]['grid_lon'],
+        'grid_lat': grid_map[data['mask_sfx']]['grid_lat']
+    }
+    for field, data in field_data.items()
+}
+
+def get_mask_sfx_from_sample_type(sample_types):
+    sample_type_to_mask_sfx = {data['sample_type']: data['mask_sfx'] for data in field_data.values()}
+
+    # Retrieve corresponding sample codes
+    mask_sfxs = [sample_type_to_mask_sfx[stype] for stype in sample_types]
+    return mask_sfxs

@@ -1,8 +1,8 @@
 import copy
 import xarray as xr
 import numpy as np
-from ecco_v4_py.llc_array_conversion import llc_tiles_to_faces, llc_tiles_to_compact
-from obsprep.utils import patchface3D_5f_to_wrld, compact2worldmap, get_sample_type
+from ecco_v4_py.llc_array_conversion import llc_tiles_to_faces, llc_faces_to_tiles
+from obsprep.utils import *
 from obsprep.interp import *
 from obsprep.time_utils import get_obs_datetime
 
@@ -50,7 +50,7 @@ class Prep:
 
     def get_obs_point(self, lons=None, lats=None, depths=None,
                                 grid_type='sphericalpolar', grid_ds=None,
-                                num_interp_points=1, sNx=30, sNy=30, max_target_grid_radius=None,
+                                num_interp_points=1, sNx=30, sNy=30, max_target_grid_radius=1e5,
                                ):
         """
         Find the nearest grid point for given ungridded longitude and latitude coordinates.
@@ -138,28 +138,14 @@ class Prep:
         self.ds[self.lon_str] = ((self.ds[self.lon_str] + 180) % 360) - 180
         print('Warning: mapping lons to [-180, 180]')
             
-        # add attributes relevant to interpolation field creation
-        self.xc = grid_ds.XC.values
-        self.yc = grid_ds.YC.values
-        self.rc = grid_ds.Z.values
-        self.maskc = grid_ds.maskC.values
-        self.maskw = grid_ds.maskW.values
-        self.masks = grid_ds.maskS.values
+        # add grid dataset to Prep
+        self.grid_ds = grid_ds
+        nx = len(self.grid_ds.i) 
+        self.nz = len(self.grid_ds.Z)
 
-        # same xc, yc in worldmap form for later        
-        nx = len(self.xc[0, 0, :]) # (last two dimensions of xc with shape (ntile, nx, nx)
-        self.nz = len(self.rc)
-        self.xc_wm = compact2worldmap(llc_tiles_to_compact(self.xc, less_output=True), nx, 1)[0, :, :]
-        self.yc_wm = compact2worldmap(llc_tiles_to_compact(self.yc, less_output=True), nx, 1)[0, :, :]
-        self.maskc_wm = compact2worldmap(llc_tiles_to_compact(self.maskc, less_output=True), nx, self.nz)
-        self.maskw_wm = compact2worldmap(llc_tiles_to_compact(self.maskw, less_output=True), nx, self.nz)
-        self.masks_wm = compact2worldmap(llc_tiles_to_compact(self.masks, less_output=True), nx, self.nz)
-        
-       # self.mask_wm = compact2worldmap(llc_tiles_to_compact(self.mask, less_output=True), nx, 1)[0, :, :]
-        
         # set nearest neighbours search radius
-        if max_target_grid_radius == None:
-            max_target_grid_radius = np.max(np.abs([grid_ds.dxG.values, grid_ds.dyG.values]))
+        if ('dyG' in grid_ds.coords) and ('dxG' in grid_ds.coords):
+            max_target_grid_radius = np.max(np.abs([self.grid_ds.dxG.values, self.grid_ds.dyG.values]))
         self.max_target_grid_radius = max_target_grid_radius
 
         self.num_interp_points = num_interp_points
@@ -168,7 +154,7 @@ class Prep:
         self.dims_interp = self.dims_obs + ['iINTERP']
 
         # run interpolation routine
-        self.obs_points = self.interp() # indices in WM view 
+        self.obs_points = self.interp() # indices in 13-face view 
 
         # add fields to ds
         self.interp_str = 'prof' if self.pkg_str == 'prof' else 'sample'
@@ -181,7 +167,7 @@ class Prep:
         self.ds[self.obs_point_str] = (self.dims_interp, self.obs_points)
 
         # add grid interp fields
-        self.get_sample_interp_info() 
+        self.get_sample_interp_info()
 
     def interp(self):
         """
@@ -192,29 +178,57 @@ class Prep:
         index_array : ndarray
             Array containing indices of the nearest grid points for the given observation points.
         """
+
+        # dataset might feature multiple sample types
+        # need to loop through each possible one and search along
+        # correct coordinates [X/Y][C/G] and mask[C/W/S]
+        mask_sfxs = get_mask_sfx_from_sample_type(self.ds.sample_type.values)
+        mask_sfxs_uniq = np.unique(mask_sfxs)
+
+        index_arrays = dict.fromkeys(mask_sfxs)
+        interp_distances = dict.fromkeys(mask_sfxs)
         
-        # turn from tiles to worldmap   
-        valid_input_index, valid_output_index, index_array, distance_array, max_target_grid_radius =\
-            get_interp_points(
-                self.ds[self.lon_str],
-                self.ds[self.lat_str],
-                self.xc_wm.ravel(),
-                self.yc_wm.ravel(),
-                #nneighbours=self.num_interp_points,
-                nneighbours=self.nneighbours_horizontal,
-                max_target_grid_radius=self.max_target_grid_radius
-            )
-        
-        if self.num_interp_points == 8:
-            valid_input_index = np.tile(valid_input_index,2)
-            valid_output_index = np.tile(valid_output_index, 2)
-            index_array = np.tile(index_array, 2) # nearest grid index
-            distance_array = np.tile(distance_array, 2)
+        for mask_sfx in mask_sfxs_uniq:
+            mask = self.grid_ds[f'mask{mask_sfx}']
+            grid_lon_str, grid_lat_str = (grid_map[mask_sfx][key] for key in ['grid_lon', 'grid_lat'])
             
-        self.interp_distance = distance_array
-        self.max_target_grid_radius = max_target_grid_radius
+            grid_lon = self.grid_ds[grid_lon_str].values.ravel()
+            grid_lat = self.grid_ds[grid_lat_str].values.ravel()
+            
+            # turn from tiles to worldmap   
+            valid_input_index, valid_output_index, index_array, distance_array, max_target_grid_radius =\
+                get_interp_points(
+                    self.ds[self.lon_str],
+                    self.ds[self.lat_str],
+                    grid_lon,
+                    grid_lat,
+                    #nneighbours=self.num_interp_points,
+                    nneighbours=self.nneighbours_horizontal,
+                    max_target_grid_radius=self.max_target_grid_radius
+                )
+            if self.num_interp_points == 8:
+                valid_input_index = np.tile(valid_input_index,2)
+                valid_output_index = np.tile(valid_output_index, 2)
+                index_array = np.tile(index_array, 2) # nearest grid index
+                distance_array = np.tile(distance_array, 2)
+            index_arrays[mask_sfx] = index_array
+            interp_distances[mask_sfx] = distance_array
+
+#            self.max_target_grid_radius = max_target_grid_radius
+            print(mask_sfx, self.max_target_grid_radius)
+
+        # now we have up to three index arrays, one for each mask
+        # organize them into a single index_array
+        if self.num_interp_points == 1:
+            for sfx in mask_sfxs_uniq:
+                index_arrays[sfx] = index_arrays[sfx][:, None]
+                interp_distances[sfx] = interp_distances[sfx][:, None]
+        index_array_out = np.array([index_arrays[sfx][i, :] for i, sfx in enumerate(mask_sfxs)])
+        interp_distance = np.array([interp_distances[sfx][i, :] for i, sfx in enumerate(mask_sfxs)])
+
+        self.interp_distance = interp_distance
         
-        return index_array
+        return index_array_out
         
         
     def get_sample_interp_info(self):
@@ -226,8 +240,8 @@ class Prep:
             return {face: np.zeros_like(xgrid[face]) for face in range(1, 6)}
         
         # transform xc and yc from worldmap back to 5faces
-        xc_5faces = llc_tiles_to_faces(self.xc, less_output=True)
-        yc_5faces = llc_tiles_to_faces(self.yc, less_output=True)
+        xc_5faces = llc_tiles_to_faces(self.grid_ds.XC, less_output=True)
+        yc_5faces = llc_tiles_to_faces(self.grid_ds.YC, less_output=True)
         
         xc_5faces.copy()
         yc_5faces.copy()
@@ -259,18 +273,13 @@ class Prep:
         # Grab values of these fields at [prof/obs]_point 
         # save tiles in worldmap views for interp later
         # probably a bad idea memory-wise for high res grids
-        tile_fields_wm = dict.fromkeys(tile_keys)
 
         for tile_key, tile_field in tile_fields.items():
             tile_field = {iF: tile_field[iF][None, :] for iF in tile_field}
 
-            # TODO: 
-            #     Replace with ecco.faces_to_tiles
-            #     then tiles_to_world
-            tile_field_wm = patchface3D_5f_to_wrld(tile_field)
-            tile_field_at_obs_point = tile_field_wm.ravel()[self.obs_points]
-
-            tile_fields_wm[tile_key] = tile_field_wm
+            # convert to 13-face format, since obs_point are indices relative to that view's what obs_point indices are in reference to
+            tile_field_13f = llc_faces_to_tiles(tile_field, less_output=True)
+            tile_field_at_obs_point = tile_field_13f.ravel()[self.obs_points]
 
             # profiles default: make singleton iINTERP dimension
             #                   set sample_interp_weight np.ones
@@ -281,12 +290,9 @@ class Prep:
             # set interp field in dataset
             self.ds[f'{self.interp_str}_interp_{tile_key}'] = (self.dims_interp, tile_field_at_obs_point)
 
-            # save tile_fields
-            self.tile_fields_wm = tile_fields_wm
-
         # set interp_k field in dataset
         if self.pkg_str == 'obs': 
-            sample_interp_k = get_sample_interp_k(self.rc, self.ds[self.depth_str], self.num_interp_points)
+            sample_interp_k = get_sample_interp_k(self.grid_ds.Z, self.ds[self.depth_str], self.num_interp_points)
             self.ds[f'{self.interp_str}_interp_k'] = (self.dims_interp, sample_interp_k)
 
         self.get_sample_type 
